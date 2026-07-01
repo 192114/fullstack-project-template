@@ -12,6 +12,12 @@ spring:
       database: ${REDIS_DATABASE:0}
       timeout: 10s
 
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 logging:
   level:
     root: INFO
