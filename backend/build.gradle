@@ -1,0 +1,59 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.shadow'
+version = '0.0.1-SNAPSHOT'
+description = 'backend'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    mybatisPlusVersion = '3.5.16'
+    saTokenVersion = '1.45.0'
+    argon2Version = '2.12'
+    springdocVersion = '3.0.2'
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-aspectj'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
+
+    implementation "com.baomidou:mybatis-plus-spring-boot4-starter:${mybatisPlusVersion}"
+    implementation "com.baomidou:mybatis-plus-jsqlparser:${mybatisPlusVersion}"
+
+    implementation "cn.dev33:sa-token-spring-boot4-starter:${saTokenVersion}"
+    implementation "cn.dev33:sa-token-redis-template:${saTokenVersion}"
+
+    implementation "de.mkammerer:argon2-jvm:${argon2Version}"
+
+    compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+    testCompileOnly 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

@@ -1,0 +1,111 @@
+package com.shadow.backend.user.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.shadow.backend.common.exception.BusinessException;
+import com.shadow.backend.common.response.PageResult;
+import com.shadow.backend.common.util.PasswordUtil;
+import com.shadow.backend.user.dto.CreateUserRequest;
+import com.shadow.backend.user.dto.UpdateUserRequest;
+import com.shadow.backend.user.dto.UserPageQuery;
+import com.shadow.backend.user.entity.User;
+import com.shadow.backend.user.mapper.UserMapper;
+import com.shadow.backend.user.response.UserResultCode;
+import com.shadow.backend.user.service.UserService;
+import com.shadow.backend.user.vo.UserVO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+@Service
+@RequiredArgsConstructor
+public class UserServiceImpl implements UserService {
+
+    private final UserMapper userMapper;
+    private final PasswordUtil passwordUtil;
+
+    @Override
+    public UserVO create(CreateUserRequest request) {
+        if (getEntityByUsername(request.getUsername()) != null) {
+            throw new BusinessException(UserResultCode.USERNAME_EXIST);
+        }
+
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPassword(passwordUtil.hash(request.getPassword()));
+        user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname() : request.getUsername());
+        user.setEmail(request.getEmail());
+        user.setStatus(1);
+        userMapper.insert(user);
+        return toVO(user);
+    }
+
+    @Override
+    public UserVO update(Long id, UpdateUserRequest request) {
+        User user = getEntityById(id);
+        if (StringUtils.hasText(request.getNickname())) {
+            user.setNickname(request.getNickname());
+        }
+        if (StringUtils.hasText(request.getEmail())) {
+            user.setEmail(request.getEmail());
+        }
+        if (request.getStatus() != null) {
+            user.setStatus(request.getStatus());
+        }
+        userMapper.updateById(user);
+        return toVO(user);
+    }
+
+    @Override
+    public void delete(Long id) {
+        getEntityById(id);
+        userMapper.deleteById(id);
+    }
+
+    @Override
+    public UserVO getById(Long id) {
+        return toVO(getEntityById(id));
+    }
+
+    @Override
+    public PageResult<UserVO> page(UserPageQuery query) {
+        Page<User> page = new Page<>(query.getPage(), query.getSize());
+        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
+                .like(StringUtils.hasText(query.getUsername()), User::getUsername, query.getUsername())
+                .orderByDesc(User::getId);
+        Page<User> userPage = userMapper.selectPage(page, wrapper);
+        Page<UserVO> resultPage = new Page<>(userPage.getCurrent(), userPage.getSize(), userPage.getTotal());
+        resultPage.setRecords(userPage.getRecords().stream().map(this::toVO).toList());
+        return PageResult.of(resultPage);
+    }
+
+    @Override
+    public UserVO getByUsername(String username) {
+        User user = getEntityByUsername(username);
+        return user == null ? null : toVO(user);
+    }
+
+    private User getEntityById(Long id) {
+        User user = userMapper.selectById(id);
+        if (user == null) {
+            throw new BusinessException(UserResultCode.USER_NOT_FOUND);
+        }
+        return user;
+    }
+
+    private User getEntityByUsername(String username) {
+        return userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
+    }
+
+    private UserVO toVO(User user) {
+        UserVO vo = new UserVO();
+        vo.setId(user.getId());
+        vo.setUsername(user.getUsername());
+        vo.setNickname(user.getNickname());
+        vo.setEmail(user.getEmail());
+        vo.setStatus(user.getStatus());
+        vo.setCreateTime(user.getCreateTime());
+        vo.setUpdateTime(user.getUpdateTime());
+        return vo;
+    }
+}

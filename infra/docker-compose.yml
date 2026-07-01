@@ -1,0 +1,28 @@
+name: fullstack-infra
+
+services:
+  mysql:
+    image: mysql:8.4.9
+    container_name: fullstack-mysql-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: fullstack_db
+      MYSQL_USER: fullstack
+      MYSQL_PASSWORD: fullstack@192114
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+
+  redis:
+    image: redis:7.4.9
+    container_name: fullstack-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+      - ./redis/redis.conf:/etc/redis/redis.conf
+    command: redis-server /etc/redis/redis.conf
