@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:native_app/features/auth/view/login_page.dart';
+import 'package:native_app/features/auth/view/register_page.dart';
+import 'package:native_app/features/auth/view/reset_password_page.dart';
+import 'package:native_app/features/user/view/change_password_page.dart';
+import 'package:native_app/features/user/view/profile_page.dart';
 
 import 'auth_notifier.dart';
 
@@ -10,11 +15,23 @@ class RoutePaths {
   /// 登录页
   static const String login = '/login';
 
-  /// 首页
+  /// 首页（个人资料页）
   static const String home = '/home';
 
   /// 欢迎页 (免登录)
   static const String welcome = '/welcome';
+
+  /// 注册页 (免登录)
+  static const String register = '/register';
+
+  /// 重置密码页 (免登录)
+  static const String resetPassword = '/reset-password';
+
+  /// 个人资料页
+  static const String profile = '/profile';
+
+  /// 修改密码页
+  static const String changePassword = '/profile/change-password';
 
   /// 404 页面
   static const String notFound = '/404';
@@ -24,6 +41,8 @@ class RoutePaths {
 const _publicRoutes = {
   RoutePaths.login,
   RoutePaths.welcome,
+  RoutePaths.register,
+  RoutePaths.resetPassword,
 };
 
 /// 应用路由配置
@@ -69,10 +88,16 @@ class AppRouter {
 
       // 路由定义
       routes: [
-        // 首页
+        // 首页（个人资料页）
         GoRoute(
           path: RoutePaths.home,
-          builder: (context, state) => const HomePage(),
+          builder: (context, state) => const ProfilePage(),
+        ),
+
+        // 个人资料页（别名，重定向到首页）
+        GoRoute(
+          path: RoutePaths.profile,
+          redirect: (context, state) => RoutePaths.home,
         ),
 
         // 登录页
@@ -81,53 +106,35 @@ class AppRouter {
           builder: (context, state) => const LoginPage(),
         ),
 
+        // 注册页
+        GoRoute(
+          path: RoutePaths.register,
+          builder: (context, state) => const RegisterPage(),
+        ),
+
+        // 重置密码页
+        GoRoute(
+          path: RoutePaths.resetPassword,
+          builder: (context, state) => const ResetPasswordPage(),
+        ),
+
+        // 修改密码页
+        GoRoute(
+          path: RoutePaths.changePassword,
+          builder: (context, state) => const ChangePasswordPage(),
+        ),
+
         // 欢迎页 (免登录)
         GoRoute(
           path: RoutePaths.welcome,
           builder: (context, state) => const WelcomePage(),
         ),
-
-        // 示例: 需要特殊权限的页面 (路由级 redirect)
-        // GoRoute(
-        //   path: '/admin',
-        //   redirect: (context, state) {
-        //     if (!userRoleManager.isAdmin) return RoutePaths.home;
-        //     return null;
-        //   },
-        //   builder: (context, state) => const AdminPage(),
-        // ),
       ],
     );
   }
 }
 
 // ==================== 占位页面 ====================
-
-/// 首页占位
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('首页')),
-      body: const Center(child: Text('首页')),
-    );
-  }
-}
-
-/// 登录页占位
-class LoginPage extends StatelessWidget {
-  const LoginPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('登录')),
-      body: const Center(child: Text('登录页')),
-    );
-  }
-}
 
 /// 欢迎页占位
 class WelcomePage extends StatelessWidget {

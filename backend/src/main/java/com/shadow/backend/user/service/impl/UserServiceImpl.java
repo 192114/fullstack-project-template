@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.shadow.backend.common.exception.BusinessException;
 import com.shadow.backend.common.response.PageResult;
 import com.shadow.backend.common.util.PasswordUtil;
+import com.shadow.backend.user.dto.ChangePasswordRequest;
 import com.shadow.backend.user.dto.CreateUserRequest;
+import com.shadow.backend.user.dto.UpdateProfileRequest;
 import com.shadow.backend.user.dto.UpdateUserRequest;
 import com.shadow.backend.user.dto.UserPageQuery;
 import com.shadow.backend.user.entity.User;
@@ -31,6 +33,7 @@ public class UserServiceImpl implements UserService {
         }
 
         User user = new User();
+        user.setPhone(request.getPhone());
         user.setUsername(request.getUsername());
         user.setPassword(passwordUtil.hash(request.getPassword()));
         user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname() : request.getUsername());
@@ -85,6 +88,37 @@ public class UserServiceImpl implements UserService {
         return user == null ? null : toVO(user);
     }
 
+    @Override
+    public User getByPhone(String phone) {
+        return userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getPhone, phone));
+    }
+
+    @Override
+    public UserVO updateProfile(Long userId, UpdateProfileRequest request) {
+        User user = getEntityById(userId);
+        if (StringUtils.hasText(request.getNickname())) {
+            user.setNickname(request.getNickname());
+        }
+        if (StringUtils.hasText(request.getEmail())) {
+            user.setEmail(request.getEmail());
+        }
+        if (StringUtils.hasText(request.getAvatar())) {
+            user.setAvatar(request.getAvatar());
+        }
+        userMapper.updateById(user);
+        return toVO(user);
+    }
+
+    @Override
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        User user = getEntityById(userId);
+        if (!passwordUtil.verify(request.getOldPassword(), user.getPassword())) {
+            throw new BusinessException(UserResultCode.OLD_PASSWORD_INCORRECT);
+        }
+        user.setPassword(passwordUtil.hash(request.getNewPassword()));
+        userMapper.updateById(user);
+    }
+
     private User getEntityById(Long id) {
         User user = userMapper.selectById(id);
         if (user == null) {
@@ -100,8 +134,10 @@ public class UserServiceImpl implements UserService {
     private UserVO toVO(User user) {
         UserVO vo = new UserVO();
         vo.setId(user.getId());
+        vo.setPhone(user.getPhone());
         vo.setUsername(user.getUsername());
         vo.setNickname(user.getNickname());
+        vo.setAvatar(user.getAvatar());
         vo.setEmail(user.getEmail());
         vo.setStatus(user.getStatus());
         vo.setCreateTime(user.getCreateTime());

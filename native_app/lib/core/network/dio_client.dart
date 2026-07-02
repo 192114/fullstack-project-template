@@ -74,7 +74,6 @@ class DioClient {
       );
     } on DioException catch (e) {
       _handleError(e);
-      rethrow;
     }
   }
 
@@ -100,7 +99,6 @@ class DioClient {
       );
     } on DioException catch (e) {
       _handleError(e);
-      rethrow;
     }
   }
 
@@ -122,7 +120,6 @@ class DioClient {
       );
     } on DioException catch (e) {
       _handleError(e);
-      rethrow;
     }
   }
 
@@ -144,7 +141,6 @@ class DioClient {
       );
     } on DioException catch (e) {
       _handleError(e);
-      rethrow;
     }
   }
 
@@ -166,12 +162,11 @@ class DioClient {
       );
     } on DioException catch (e) {
       _handleError(e);
-      rethrow;
     }
   }
 
   /// 处理错误
-  void _handleError(DioException error) {
+  Never _handleError(DioException error) {
     final apiException = error.error is ApiException
         ? error.error as ApiException
         : ApiException.fromDioException(error);
@@ -180,6 +175,8 @@ class DioClient {
       'API Error: ${apiException.code} - ${apiException.message}',
       error: apiException,
     );
+
+    throw apiException;
   }
 }
 

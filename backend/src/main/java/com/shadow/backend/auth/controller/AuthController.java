@@ -1,13 +1,23 @@
 package com.shadow.backend.auth.controller;
 
-import com.shadow.backend.auth.dto.LoginRequest;
+import com.shadow.backend.auth.constant.SmsScene;
 import com.shadow.backend.auth.dto.LoginResponse;
+import com.shadow.backend.auth.dto.PasswordLoginRequest;
+import com.shadow.backend.auth.dto.RefreshTokenRequest;
+import com.shadow.backend.auth.dto.RegisterRequest;
+import com.shadow.backend.auth.dto.ResetPasswordRequest;
+import com.shadow.backend.auth.dto.SendCodeRequest;
+import com.shadow.backend.auth.dto.SmsLoginRequest;
+import com.shadow.backend.auth.response.AuthResultCode;
 import com.shadow.backend.auth.service.AuthService;
+import com.shadow.backend.auth.service.SmsService;
+import com.shadow.backend.auth.vo.RefreshTokenResponse;
+import com.shadow.backend.common.exception.BusinessException;
 import com.shadow.backend.common.response.Result;
-import com.shadow.backend.user.dto.CreateUserRequest;
 import com.shadow.backend.user.vo.UserVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,10 +29,36 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final SmsService smsService;
 
-    @PostMapping("/login")
-    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return Result.success(authService.login(request));
+    @PostMapping("/send-code")
+    public Result<Void> sendCode(@Valid @RequestBody SendCodeRequest request) {
+        SmsScene scene = SmsScene.fromName(request.getScene());
+        if (scene == null) {
+            throw new BusinessException(AuthResultCode.SMS_SCENE_INVALID);
+        }
+        smsService.sendCode(request.getPhone(), scene);
+        return Result.success();
+    }
+
+    @PostMapping("/login/password")
+    public Result<LoginResponse> loginByPassword(@Valid @RequestBody PasswordLoginRequest request) {
+        return Result.success(authService.loginByPassword(request));
+    }
+
+    @PostMapping("/login/sms")
+    public Result<LoginResponse> loginBySms(@Valid @RequestBody SmsLoginRequest request) {
+        return Result.success(authService.loginBySms(request));
+    }
+
+    @PostMapping("/register")
+    public Result<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return Result.success(authService.register(request));
+    }
+
+    @PostMapping("/refresh")
+    public Result<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return Result.success(authService.refresh(request));
     }
 
     @PostMapping("/logout")
@@ -31,8 +67,14 @@ public class AuthController {
         return Result.success();
     }
 
-    @PostMapping("/register")
-    public Result<UserVO> register(@Valid @RequestBody CreateUserRequest request) {
-        return Result.success(authService.register(request));
+    @GetMapping("/me")
+    public Result<UserVO> me() {
+        return Result.success(authService.getCurrentUser());
+    }
+
+    @PostMapping("/reset-password")
+    public Result<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return Result.success();
     }
 }

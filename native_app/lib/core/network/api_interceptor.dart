@@ -128,8 +128,9 @@ class ApiInterceptor extends Interceptor {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final newAccessToken = response.data['accessToken'] as String?;
-        final newRefreshToken = response.data['refreshToken'] as String?;
+        final data = response.data['data'] as Map<String, dynamic>?;
+        final newAccessToken = data?['accessToken'] as String?;
+        final newRefreshToken = data?['refreshToken'] as String?;
 
         if (newAccessToken != null) {
           await _tokenManager.saveTokens(

@@ -8,8 +8,10 @@ import java.time.LocalDateTime;
 public class UserVO {
 
     private Long id;
+    private String phone;
     private String username;
     private String nickname;
+    private String avatar;
     private String email;
     private Integer status;
     private LocalDateTime createTime;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'config/env/app_env.dart';
@@ -28,5 +29,5 @@ void main() async {
   // 5. 初始化 DioClient
   dioClient = DioClient(envConfig: envConfig, tokenManager: tokenManager);
 
-  runApp(const App());
+  runApp(const ProviderScope(child: App()));
 }

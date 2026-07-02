@@ -14,8 +14,12 @@ public class SaTokenConfigure implements WebMvcConfigurer {
         registry.addInterceptor(new SaInterceptor(handle -> StpUtil.checkLogin()))
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(
-                        "/api/auth/login",
+                        "/api/auth/login/password",
+                        "/api/auth/login/sms",
                         "/api/auth/register",
+                        "/api/auth/refresh",
+                        "/api/auth/send-code",
+                        "/api/auth/reset-password",
                         "/swagger-ui/**",
                         "/swagger-ui.html",
                         "/v3/api-docs/**"

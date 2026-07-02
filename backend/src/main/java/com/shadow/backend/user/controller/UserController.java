@@ -2,7 +2,10 @@ package com.shadow.backend.user.controller;
 
 import com.shadow.backend.common.response.PageResult;
 import com.shadow.backend.common.response.Result;
+import com.shadow.backend.common.util.LoginUserUtil;
+import com.shadow.backend.user.dto.ChangePasswordRequest;
 import com.shadow.backend.user.dto.CreateUserRequest;
+import com.shadow.backend.user.dto.UpdateProfileRequest;
 import com.shadow.backend.user.dto.UpdateUserRequest;
 import com.shadow.backend.user.dto.UserPageQuery;
 import com.shadow.backend.user.service.UserService;
@@ -48,6 +51,17 @@ public class UserController {
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         userService.delete(id);
+        return Result.success();
+    }
+
+    @PutMapping("/profile")
+    public Result<UserVO> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
+        return Result.success(userService.updateProfile(LoginUserUtil.currentUserId(), request));
+    }
+
+    @PutMapping("/password")
+    public Result<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        userService.changePassword(LoginUserUtil.currentUserId(), request);
         return Result.success();
     }
 }

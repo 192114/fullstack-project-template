@@ -1,15 +1,27 @@
 package com.shadow.backend.auth.service;
 
-import com.shadow.backend.auth.dto.LoginRequest;
 import com.shadow.backend.auth.dto.LoginResponse;
-import com.shadow.backend.user.dto.CreateUserRequest;
+import com.shadow.backend.auth.dto.PasswordLoginRequest;
+import com.shadow.backend.auth.dto.RegisterRequest;
+import com.shadow.backend.auth.dto.ResetPasswordRequest;
+import com.shadow.backend.auth.dto.SmsLoginRequest;
+import com.shadow.backend.auth.dto.RefreshTokenRequest;
+import com.shadow.backend.auth.vo.RefreshTokenResponse;
 import com.shadow.backend.user.vo.UserVO;
 
 public interface AuthService {
 
-    LoginResponse login(LoginRequest request);
+    LoginResponse loginByPassword(PasswordLoginRequest req);
+
+    LoginResponse loginBySms(SmsLoginRequest req);
+
+    LoginResponse register(RegisterRequest req);
+
+    RefreshTokenResponse refresh(RefreshTokenRequest req);
 
     void logout();
 
-    UserVO register(CreateUserRequest request);
+    UserVO getCurrentUser();
+
+    void resetPassword(ResetPasswordRequest req);
 }
