@@ -17,6 +17,20 @@
           "path" : "/Users/shadow/workspace/fullstack-project-template/native_app/ios/Flutter/ephemeral/Packages/.packages/FlutterFramework"
         },
         "subpath" : "flutterframework"
+      },
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "shared_preferences_foundation-2.5.6",
+          "kind" : "fileSystem",
+          "location" : "/Users/shadow/workspace/fullstack-project-template/native_app/ios/Flutter/ephemeral/Packages/.packages/shared_preferences_foundation-2.5.6",
+          "name" : "shared_preferences_foundation"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/shadow/workspace/fullstack-project-template/native_app/ios/Flutter/ephemeral/Packages/.packages/shared_preferences_foundation-2.5.6"
+        },
+        "subpath" : "shared_preferences_foundation-2.5.6"
       }
     ],
     "prebuilts" : [
