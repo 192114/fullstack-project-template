@@ -38,3 +38,4 @@ flutter:
   assets:
     - lib/config/env/.env.dev
     - lib/config/env/.env.prod
+    - assets/images/

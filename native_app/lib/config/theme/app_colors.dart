@@ -1,56 +1,71 @@
 import 'package:flutter/material.dart';
 
 /// 应用颜色常量
+/// 基于科研工作台设计稿的蓝色主题
 /// 手动定义完整 ColorScheme，精确控制每个颜色值
 class AppColors {
   AppColors._();
 
   // ==================== 品牌色 ====================
-  /// 主色 - 品牌主色调
-  static const Color primary = Color(0xFF6750A4);
+  /// 主色 - 科研蓝
+  static const Color primary = Color(0xFF1565C0);
   static const Color onPrimary = Color(0xFFFFFFFF);
-  static const Color primaryContainer = Color(0xFFEADDFF);
-  static const Color onPrimaryContainer = Color(0xFF21005D);
+  static const Color primaryContainer = Color(0xFFD1E4FF);
+  static const Color onPrimaryContainer = Color(0xFF001D36);
 
   // ==================== 辅助色 ====================
-  static const Color secondary = Color(0xFF625B71);
+  static const Color secondary = Color(0xFF535F70);
   static const Color onSecondary = Color(0xFFFFFFFF);
-  static const Color secondaryContainer = Color(0xFFE8DEF8);
-  static const Color onSecondaryContainer = Color(0xFF1D192B);
+  static const Color secondaryContainer = Color(0xFFD7E3F7);
+  static const Color onSecondaryContainer = Color(0xFF101C2B);
 
   // ==================== 第三色 ====================
-  static const Color tertiary = Color(0xFF7D5260);
+  static const Color tertiary = Color(0xFF6B5778);
   static const Color onTertiary = Color(0xFFFFFFFF);
-  static const Color tertiaryContainer = Color(0xFFFFD8E4);
-  static const Color onTertiaryContainer = Color(0xFF31111D);
+  static const Color tertiaryContainer = Color(0xFFF2DAFF);
+  static const Color onTertiaryContainer = Color(0xFF251431);
 
   // ==================== 错误色 ====================
-  static const Color error = Color(0xFFB3261E);
+  static const Color error = Color(0xFFBA1A1A);
   static const Color onError = Color(0xFFFFFFFF);
-  static const Color errorContainer = Color(0xFFF9DEDC);
-  static const Color onErrorContainer = Color(0xFF410E0B);
+  static const Color errorContainer = Color(0xFFFFDAD6);
+  static const Color onErrorContainer = Color(0xFF410002);
 
   // ==================== 表面色 ====================
-  static const Color surface = Color(0xFFFFFBFE);
-  static const Color onSurface = Color(0xFF1C1B1F);
-  static const Color surfaceVariant = Color(0xFFE7E0EC);
-  static const Color onSurfaceVariant = Color(0xFF49454F);
-  static const Color surfaceTint = Color(0xFF6750A4);
+  static const Color surface = Color(0xFFFDFBFF);
+  static const Color onSurface = Color(0xFF1A1C1E);
+  static const Color surfaceVariant = Color(0xFFDFE2EB);
+  static const Color onSurfaceVariant = Color(0xFF43474E);
+  static const Color surfaceTint = Color(0xFF1565C0);
 
   // ==================== 背景色 ====================
-  static const Color background = Color(0xFFFFFBFE);
-  static const Color onBackground = Color(0xFF1C1B1F);
+  static const Color background = Color(0xFFEDF5FF);
+  static const Color onBackground = Color(0xFF1A1C1E);
 
   // ==================== 轮廓色 ====================
-  static const Color outline = Color(0xFF79747E);
-  static const Color outlineVariant = Color(0xFFCAC4D0);
+  static const Color outline = Color(0xFF73777F);
+  static const Color outlineVariant = Color(0xFFC3C6CF);
 
   // ==================== 其他 ====================
   static const Color shadow = Color(0xFF000000);
   static const Color scrim = Color(0xFF000000);
-  static const Color inverseSurface = Color(0xFF313033);
-  static const Color onInverseSurface = Color(0xFFF4EFF4);
-  static const Color inversePrimary = Color(0xFFD0BCFF);
+  static const Color inverseSurface = Color(0xFF2F3033);
+  static const Color onInverseSurface = Color(0xFFF1F0F4);
+  static const Color inversePrimary = Color(0xFFA0C7FF);
+
+  // ==================== 设计稿专用色 ====================
+  /// 深蓝文字色 - 用于标题和标语
+  static const Color darkText = Color(0xFF0A1628);
+  /// 次要文字色 - 用于副标题和提示
+  static const Color secondaryText = Color(0xFF6B7B8D);
+  /// 输入框边框色
+  static const Color inputBorder = Color(0xFFE0E6ED);
+  /// 输入框提示文字色
+  static const Color hintText = Color(0xFFB0BEC5);
+  /// 登录卡片背景色
+  static const Color cardBackground = Color(0xFFFFFFFF);
+  /// 分割线颜色
+  static const Color dividerColor = Color(0xFFE0E6ED);
 
   // ==================== 快捷访问 ====================
   /// 成功色
@@ -97,33 +112,33 @@ class AppColors {
   /// 暗色模式 ColorScheme (预留)
   static ColorScheme get darkColorScheme => const ColorScheme(
         brightness: Brightness.dark,
-        primary: Color(0xFFD0BCFF),
-        onPrimary: Color(0xFF381E72),
-        primaryContainer: Color(0xFF4F378B),
-        onPrimaryContainer: Color(0xFFEADDFF),
-        secondary: Color(0xFFCCC2DC),
-        onSecondary: Color(0xFF332D41),
-        secondaryContainer: Color(0xFF4A4458),
-        onSecondaryContainer: Color(0xFFE8DEF8),
-        tertiary: Color(0xFFEFB8C8),
-        onTertiary: Color(0xFF492532),
-        tertiaryContainer: Color(0xFF633B48),
-        onTertiaryContainer: Color(0xFFFFD8E4),
-        error: Color(0xFFF2B8B5),
-        onError: Color(0xFF601410),
-        errorContainer: Color(0xFF8C1D18),
-        onErrorContainer: Color(0xFFF9DEDC),
-        surface: Color(0xFF1C1B1F),
-        onSurface: Color(0xFFE6E1E5),
-        surfaceTint: Color(0xFFD0BCFF),
-        surfaceContainerHighest: Color(0xFF49454F),
-        onSurfaceVariant: Color(0xFFCAC4D0),
-        outline: Color(0xFF938F99),
-        outlineVariant: Color(0xFF49454F),
+        primary: Color(0xFFA0C7FF),
+        onPrimary: Color(0xFF003258),
+        primaryContainer: Color(0xFF00497D),
+        onPrimaryContainer: Color(0xFFD1E4FF),
+        secondary: Color(0xFFBBC7DB),
+        onSecondary: Color(0xFF253140),
+        secondaryContainer: Color(0xFF3C4858),
+        onSecondaryContainer: Color(0xFFD7E3F7),
+        tertiary: Color(0xFFD7BDE4),
+        onTertiary: Color(0xFF3B2948),
+        tertiaryContainer: Color(0xFF523F5F),
+        onTertiaryContainer: Color(0xFFF2DAFF),
+        error: Color(0xFFFFB4AB),
+        onError: Color(0xFF690005),
+        errorContainer: Color(0xFF93000A),
+        onErrorContainer: Color(0xFFFFDAD6),
+        surface: Color(0xFF1A1C1E),
+        onSurface: Color(0xFFE3E2E6),
+        surfaceTint: Color(0xFFA0C7FF),
+        surfaceContainerHighest: Color(0xFF43474E),
+        onSurfaceVariant: Color(0xFFC3C6CF),
+        outline: Color(0xFF8D9199),
+        outlineVariant: Color(0xFF43474E),
         shadow: Color(0xFF000000),
         scrim: Color(0xFF000000),
-        inverseSurface: Color(0xFFE6E1E5),
-        onInverseSurface: Color(0xFF313033),
-        inversePrimary: Color(0xFF6750A4),
+        inverseSurface: Color(0xFFE3E2E6),
+        onInverseSurface: Color(0xFF2F3033),
+        inversePrimary: Color(0xFF1565C0),
       );
 }

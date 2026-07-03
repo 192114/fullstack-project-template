@@ -12,8 +12,8 @@ class AuthRepositoryImpl implements AuthRepository {
 
   AuthRepositoryImpl({
     required this._remoteDataSource,
-    required TokenManager tokenManager,
-  })  : _tokenManager = tokenManager;
+    required this._tokenManager,
+  });
 
   @override
   Future<void> sendCode(String phone, String scene) async {
