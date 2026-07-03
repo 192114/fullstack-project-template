@@ -150,13 +150,14 @@ class _SmsCodeInputState extends ConsumerState<SmsCodeInput> {
           color: AppColors.secondaryText,
           size: 22,
         ),
-        suffixIconConstraints: const BoxConstraints(maxHeight: 24),
-        suffixIcon: Align(
-          alignment: Alignment.centerRight,
+        suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+        suffixIcon: IgnorePointer(
+          ignoring: !canSend,
           child: GestureDetector(
-            onTap: canSend ? _sendCode : null,
+            onTap: _sendCode,
+            behavior: HitTestBehavior.opaque,
             child: Padding(
-              padding: const EdgeInsets.only(right: 16),
+              padding: const EdgeInsets.only(right: 16, left: 8),
               child: _isSending
                   ? const SizedBox(
                       width: 18,
@@ -169,7 +170,9 @@ class _SmsCodeInputState extends ConsumerState<SmsCodeInput> {
                   : Text(
                       _countdown > 0 ? '${_countdown}s后重发' : '获取验证码',
                       style: AppTypography.bodyMedium.copyWith(
-                        color: canSend ? AppColors.primary : AppColors.hintText,
+                        color: canSend
+                            ? AppColors.primary
+                            : AppColors.hintText,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
