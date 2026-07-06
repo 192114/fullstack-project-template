@@ -9,6 +9,9 @@ import { AuthLayout } from '@/layouts/AuthLayout'
 import { AdminLayout } from '@/layouts/AdminLayout'
 import { LoginPage } from '@/pages/LoginPage'
 import { HomePage } from '@/pages/HomePage'
+import { MenuPage } from '@/pages/MenuPage'
+import { RolePage } from '@/pages/RolePage'
+import { AdminUserPage } from '@/pages/AdminUserPage'
 
 // Root route
 const rootRoute = createRootRoute({
@@ -36,7 +39,7 @@ const adminRoute = createRoute({
   component: AdminLayout,
   beforeLoad: () => {
     // Check authentication - redirect to login if not authenticated
-    const token = localStorage.getItem('accessToken')
+    const token = localStorage.getItem('token')
     if (!token) {
       throw redirect({
         to: '/login',
@@ -52,10 +55,31 @@ const homeRoute = createRoute({
   component: HomePage,
 })
 
+// Menu management route
+const menuRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/menus',
+  component: MenuPage,
+})
+
+// Role management route
+const roleRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/roles',
+  component: RolePage,
+})
+
+// Admin user management route
+const adminUserRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/admin-users',
+  component: AdminUserPage,
+})
+
 // Route tree
 const routeTree = rootRoute.addChildren([
   authRoute.addChildren([loginRoute]),
-  adminRoute.addChildren([homeRoute]),
+  adminRoute.addChildren([homeRoute, menuRoute, roleRoute, adminUserRoute]),
 ])
 
 // Create router

@@ -34,9 +34,6 @@ CREATE TABLE IF NOT EXISTS app_sms_log (
     INDEX idx_phone_scene (phone, scene),
     INDEX idx_send_time (send_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='短信验证码日志表';
-CREATE DATABASE IF NOT EXISTS backend DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-USE backend;
 
 CREATE TABLE IF NOT EXISTS sys_user (
     id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
@@ -50,4 +47,54 @@ CREATE TABLE IF NOT EXISTS sys_user (
     update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_username (username)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='管理员用户表';
+
+-- ======================== RBAC 权限系统 ========================
+
+CREATE TABLE IF NOT EXISTS sys_menu (
+    id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    parent_id   BIGINT       NOT NULL DEFAULT 0     COMMENT '父菜单ID, 0=根节点',
+    name        VARCHAR(64)  NOT NULL               COMMENT '菜单名称',
+    type        TINYINT      NOT NULL               COMMENT '类型: 1=目录 2=菜单 3=按钮',
+    path        VARCHAR(128) DEFAULT NULL           COMMENT '路由路径',
+    icon        VARCHAR(64)  DEFAULT NULL           COMMENT '图标(lucide名称)',
+    sort_order  INT          NOT NULL DEFAULT 0     COMMENT '排序',
+    permission  VARCHAR(128) DEFAULT NULL           COMMENT '权限标识如 user:create',
+    visible     TINYINT      NOT NULL DEFAULT 1     COMMENT '是否可见: 0=隐藏 1=显示',
+    status      TINYINT      NOT NULL DEFAULT 1     COMMENT '状态: 0=禁用 1=启用',
+    deleted     TINYINT      NOT NULL DEFAULT 0     COMMENT '逻辑删除',
+    create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    INDEX idx_parent_id (parent_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='菜单权限表';
+
+CREATE TABLE IF NOT EXISTS sys_role (
+    id          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+    name        VARCHAR(64)  NOT NULL               COMMENT '角色名称',
+    code        VARCHAR(64)  NOT NULL               COMMENT '角色编码',
+    sort_order  INT          NOT NULL DEFAULT 0     COMMENT '排序',
+    status      TINYINT      NOT NULL DEFAULT 1     COMMENT '状态: 0=禁用 1=启用',
+    remark      VARCHAR(256) DEFAULT NULL           COMMENT '备注',
+    deleted     TINYINT      NOT NULL DEFAULT 0     COMMENT '逻辑删除',
+    create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色表';
+
+CREATE TABLE IF NOT EXISTS sys_role_menu (
+    id      BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    role_id BIGINT NOT NULL COMMENT '角色ID',
+    menu_id BIGINT NOT NULL COMMENT '菜单ID',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_role_menu (role_id, menu_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色菜单关联表';
+
+CREATE TABLE IF NOT EXISTS sys_user_role (
+    id      BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+    user_id BIGINT NOT NULL COMMENT '管理员ID (sys_user.id)',
+    role_id BIGINT NOT NULL COMMENT '角色ID',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_role (user_id, role_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='管理员角色关联表';

@@ -16,10 +16,10 @@ import {
 import { authApi } from '@/services/api/auth'
 
 const loginSchema = z.object({
-  phone: z
+  username: z
     .string()
-    .min(1, '请输入手机号')
-    .regex(/^1[3-9]\d{9}$/, '请输入正确的手机号'),
+    .min(1, '请输入用户名')
+    .max(32, '用户名最多32个字符'),
   password: z
     .string()
     .min(1, '请输入密码')
@@ -41,7 +41,7 @@ export function LoginPage() {
     formState: { errors },
   } = useForm<LoginForm>({
     defaultValues: {
-      phone: '',
+      username: '',
       password: '',
     },
   })
@@ -50,9 +50,8 @@ export function LoginPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const response = await authApi.loginPassword(data)
-      localStorage.setItem('accessToken', response.accessToken)
-      localStorage.setItem('refreshToken', response.refreshToken)
+      const response = await authApi.login(data)
+      localStorage.setItem('token', response.token)
       navigate({ to: '/' })
     } catch (err) {
       setError(err instanceof Error ? err.message : '登录失败，请稍后重试')
@@ -76,16 +75,16 @@ export function LoginPage() {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="phone">手机号</Label>
+            <Label htmlFor="username">用户名</Label>
             <Input
-              id="phone"
-              type="tel"
-              placeholder="请输入手机号"
-              autoComplete="tel"
-              {...register('phone')}
+              id="username"
+              type="text"
+              placeholder="请输入用户名"
+              autoComplete="username"
+              {...register('username')}
             />
-            {errors.phone && (
-              <p className="text-sm text-destructive">{errors.phone.message}</p>
+            {errors.username && (
+              <p className="text-sm text-destructive">{errors.username.message}</p>
             )}
           </div>
 

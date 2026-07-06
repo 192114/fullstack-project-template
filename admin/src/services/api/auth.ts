@@ -1,36 +1,34 @@
 import request, { requestApi } from '@/services/request'
 import type {
   ApiResponse,
-  PasswordLoginRequest,
-  LoginResponse,
-  RefreshTokenRequest,
-  RefreshTokenResponse,
-  UserInfo,
+  AdminLoginRequest,
+  AdminLoginResponse,
+  AdminUserInfo,
 } from '@/types/api'
 
-/** Auth API */
+/** Admin Auth API */
 export const authApi = {
-  /** Login with phone + password */
-  loginPassword: (data: PasswordLoginRequest) =>
-    requestApi<LoginResponse>(
-      request.post<ApiResponse<LoginResponse>>('/api/auth/login/password', data)
-    ),
-
-  /** Refresh access token */
-  refreshToken: (data: RefreshTokenRequest) =>
-    requestApi<RefreshTokenResponse>(
-      request.post<ApiResponse<RefreshTokenResponse>>('/api/auth/refresh', data)
+  /** Login with username + password */
+  login: (data: AdminLoginRequest) =>
+    requestApi<AdminLoginResponse>(
+      request.post<ApiResponse<AdminLoginResponse>>('/api/admin/auth/login', data)
     ),
 
   /** Logout */
   logout: () =>
     requestApi<null>(
-      request.post<ApiResponse<null>>('/api/auth/logout')
+      request.post<ApiResponse<null>>('/api/admin/auth/logout')
     ),
 
-  /** Get current user info */
-  getCurrentUser: () =>
-    requestApi<UserInfo>(
-      request.get<ApiResponse<UserInfo>>('/api/auth/me')
+  /** Get current admin user info */
+  getCurrentAdmin: () =>
+    requestApi<AdminUserInfo>(
+      request.get<ApiResponse<AdminUserInfo>>('/api/admin/auth/me')
+    ),
+
+  /** Get current admin permissions (for button-level access control) */
+  getPermissions: () =>
+    requestApi<string[]>(
+      request.get<ApiResponse<string[]>>('/api/admin/auth/permissions')
     ),
 }

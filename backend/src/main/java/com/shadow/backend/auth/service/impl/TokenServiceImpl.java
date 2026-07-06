@@ -1,6 +1,6 @@
 package com.shadow.backend.auth.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
+import com.shadow.backend.common.util.StpAppUtil;
 import com.shadow.backend.auth.response.AuthResultCode;
 import com.shadow.backend.auth.service.TokenService;
 import com.shadow.backend.auth.vo.TokenPair;
@@ -26,8 +26,8 @@ public class TokenServiceImpl implements TokenService {
 
     @Override
     public TokenPair createTokens(Long userId) {
-        StpUtil.login(userId);
-        String accessToken = StpUtil.getTokenValue();
+        StpAppUtil.login(userId);
+        String accessToken = StpAppUtil.getTokenValue();
 
         String refreshToken = UUID.randomUUID().toString().replace("-", "");
         redisTemplate.opsForValue().set(
@@ -36,7 +36,7 @@ public class TokenServiceImpl implements TokenService {
                 REFRESH_TTL
         );
 
-        StpUtil.getSession().set(SESSION_REFRESH_TOKEN_KEY, refreshToken);
+        StpAppUtil.getSession().set(SESSION_REFRESH_TOKEN_KEY, refreshToken);
 
         log.info("创建Token: userId={}", userId);
         return new TokenPair(accessToken, refreshToken);
@@ -63,7 +63,7 @@ public class TokenServiceImpl implements TokenService {
         if (refreshToken != null && !refreshToken.isEmpty()) {
             redisTemplate.delete(REFRESH_KEY_PREFIX + refreshToken);
         }
-        StpUtil.logout();
+        StpAppUtil.logout();
         log.info("移除Token: refreshToken={}", refreshToken);
     }
 }

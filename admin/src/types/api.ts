@@ -17,21 +17,31 @@ export interface PageResult<T = unknown> {
   current: number
 }
 
-/** Login request */
-export interface PasswordLoginRequest {
-  phone: string
+/** Admin login request */
+export interface AdminLoginRequest {
+  username: string
   password: string
 }
 
-/** Login response */
-export interface LoginResponse {
-  accessToken: string
-  refreshToken: string
-  user: UserInfo
+/** Admin login response (single token, no refresh token) */
+export interface AdminLoginResponse {
+  token: string
+  user: AdminUserInfo
 }
 
-/** User info */
-export interface UserInfo {
+/** Admin user info */
+export interface AdminUserInfo {
+  id: number
+  username: string
+  nickname: string
+  email: string | null
+  status: number
+  createTime: string
+  updateTime: string
+}
+
+/** App user info (for admin user management) */
+export interface AppUserInfo {
   id: number
   phone: string
   username: string
@@ -43,13 +53,97 @@ export interface UserInfo {
   updateTime: string
 }
 
-/** Refresh token request */
-export interface RefreshTokenRequest {
-  refreshToken: string
+// ======================== RBAC ========================
+
+/** 菜单树 */
+export interface MenuTreeVO {
+  id: number
+  parentId: number
+  name: string
+  type: number  // 1=目录 2=菜单 3=按钮
+  path: string | null
+  icon: string | null
+  sortOrder: number
+  permission: string | null
+  visible: number
+  status: number
+  children: MenuTreeVO[]
 }
 
-/** Refresh token response */
-export interface RefreshTokenResponse {
-  accessToken: string
-  refreshToken: string
+/** 创建菜单请求 */
+export interface CreateMenuRequest {
+  parentId?: number
+  name: string
+  type: number
+  path?: string
+  icon?: string
+  sortOrder?: number
+  permission?: string
+  visible?: number
+  status?: number
+}
+
+/** 修改菜单请求 */
+export interface UpdateMenuRequest extends CreateMenuRequest {}
+
+/** 角色 */
+export interface RoleVO {
+  id: number
+  name: string
+  code: string
+  sortOrder: number
+  status: number
+  remark: string | null
+  createTime: string
+  updateTime: string
+  menuIds?: number[]
+}
+
+/** 创建角色请求 */
+export interface CreateRoleRequest {
+  name: string
+  code: string
+  sortOrder?: number
+  remark?: string
+}
+
+/** 修改角色请求 */
+export interface UpdateRoleRequest {
+  name: string
+  sortOrder?: number
+  remark?: string
+}
+
+/** 管理员用户(含角色) */
+export interface AdminUserManageVO {
+  id: number
+  username: string
+  nickname: string | null
+  email: string | null
+  status: number
+  createTime: string
+  updateTime: string
+  roles: AdminUserRole[]
+}
+
+export interface AdminUserRole {
+  id: number
+  name: string
+  code: string
+}
+
+/** 创建管理员请求 */
+export interface CreateAdminUserRequest {
+  username: string
+  password: string
+  nickname?: string
+  email?: string
+  status?: number
+}
+
+/** 修改管理员请求 */
+export interface UpdateAdminUserRequest {
+  nickname?: string
+  email?: string
+  status?: number
 }

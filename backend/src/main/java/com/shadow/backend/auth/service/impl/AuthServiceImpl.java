@@ -1,6 +1,6 @@
 package com.shadow.backend.auth.service.impl;
 
-import cn.dev33.satoken.stp.StpUtil;
+import com.shadow.backend.common.util.StpAppUtil;
 import com.shadow.backend.auth.constant.SmsScene;
 import com.shadow.backend.auth.dto.LoginResponse;
 import com.shadow.backend.auth.dto.PasswordLoginRequest;
@@ -89,7 +89,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void logout() {
-        String refreshToken = (String) StpUtil.getSession().get("refreshToken");
+        String refreshToken = (String) StpAppUtil.getSession().get("refreshToken");
         tokenService.removeTokens(refreshToken);
     }
 

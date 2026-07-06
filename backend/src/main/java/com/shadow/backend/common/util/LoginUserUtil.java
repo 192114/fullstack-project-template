@@ -1,6 +1,6 @@
 package com.shadow.backend.common.util;
 
-import cn.dev33.satoken.stp.StpUtil;
+import com.shadow.backend.common.util.StpAppUtil;
 
 public final class LoginUserUtil {
 
@@ -8,10 +8,10 @@ public final class LoginUserUtil {
     }
 
     public static Long currentUserId() {
-        return StpUtil.getLoginIdAsLong();
+        return StpAppUtil.getLoginIdAsLong();
     }
 
     public static boolean isLogin() {
-        return StpUtil.isLogin();
+        return StpAppUtil.isLogin();
     }
 }
