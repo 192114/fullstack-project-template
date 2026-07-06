@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Mail, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -61,55 +61,68 @@ export function LoginPage() {
   }
 
   return (
-    <Card className="mx-4 shadow-lg">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">欢迎登录</CardTitle>
-        <CardDescription>Admin Dashboard 管理系统</CardDescription>
+    <Card className="mx-auto w-full max-w-md rounded-2xl border-slate-200/80 shadow-[0_10px_40px_rgba(0,0,0,0.06)]">
+      <CardHeader className="gap-2 text-center">
+        <CardTitle className="text-2xl font-bold text-slate-900">
+          欢迎登录
+        </CardTitle>
+        <CardDescription className="text-sm text-slate-500">
+          Admin Dashboard 管理系统
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <CardContent className="space-y-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {error && (
-            <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
               {error}
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="username">用户名</Label>
-            <Input
-              id="username"
-              type="text"
-              placeholder="请输入用户名"
-              autoComplete="username"
-              {...register('username')}
-            />
+            <Label htmlFor="username" className="text-sm font-medium text-slate-700">
+              用户名
+            </Label>
+            <div className="relative">
+              <Mail className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+              <Input
+                id="username"
+                type="text"
+                placeholder="请输入用户名"
+                autoComplete="username"
+                className="h-11 rounded-lg border-slate-200 bg-slate-50/50 pl-10 text-sm transition-colors placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:bg-white focus-visible:ring-blue-500/20"
+                {...register('username')}
+              />
+            </div>
             {errors.username && (
               <p className="text-sm text-destructive">{errors.username.message}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">密码</Label>
+            <Label htmlFor="password" className="text-sm font-medium text-slate-700">
+              密码
+            </Label>
             <div className="relative">
+              <Lock className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
               <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="请输入密码"
                 autoComplete="current-password"
-                className="pr-10"
+                className="h-11 rounded-lg border-slate-200 bg-slate-50/50 pl-10 pr-10 text-sm transition-colors placeholder:text-slate-400 focus-visible:border-blue-500 focus-visible:bg-white focus-visible:ring-blue-500/20"
                 {...register('password')}
               />
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute right-0 top-0 size-9"
+                className="absolute right-0 top-0 size-11 hover:bg-transparent"
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? (
-                  <EyeOff className="size-4" />
+                  <EyeOff className="size-4 text-slate-400" />
                 ) : (
-                  <Eye className="size-4" />
+                  <Eye className="size-4 text-slate-400" />
                 )}
               </Button>
             </div>
@@ -120,7 +133,11 @@ export function LoginPage() {
             )}
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button
+            type="submit"
+            className="h-11 w-full rounded-lg bg-slate-900 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-800"
+            disabled={isLoading}
+          >
             {isLoading && <Loader2 className="size-4 animate-spin" />}
             {isLoading ? '登录中...' : '登 录'}
           </Button>

@@ -1,11 +1,13 @@
 import { useState, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, Trash2, ChevronRight, ChevronDown, Loader2 } from 'lucide-react'
+import {
+  Plus, Pencil, Trash2, ChevronRight, ChevronDown, Loader2,
+  Search, RotateCcw, AlertTriangle, LayoutDashboard,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -15,14 +17,15 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import { cn } from '@/lib/utils'
 import { menuApi } from '@/services/api/menu'
 import { useAllMenus } from '@/hooks/useMenuTree'
 import type { MenuTreeVO, CreateMenuRequest } from '@/types/api'
 
-const TYPE_LABELS: Record<number, { text: string; variant: 'default' | 'secondary' | 'outline' }> = {
-  1: { text: '目录', variant: 'secondary' },
-  2: { text: '菜单', variant: 'default' },
-  3: { text: '按钮', variant: 'outline' },
+const TYPE_LABELS: Record<number, { text: string; className: string }> = {
+  1: { text: '目录', className: 'bg-blue-100 text-blue-700' },
+  2: { text: '菜单', className: 'bg-green-100 text-green-700' },
+  3: { text: '按钮', className: 'bg-gray-100 text-gray-600' },
 }
 
 interface FlatMenu extends MenuTreeVO {
@@ -59,6 +62,7 @@ export function MenuPage() {
   const queryClient = useQueryClient()
   const { data: menus, isLoading } = useAllMenus()
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const [searchName, setSearchName] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editingMenu, setEditingMenu] = useState<MenuTreeVO | null>(null)
@@ -136,79 +140,122 @@ export function MenuPage() {
     }
   }
 
+  const handleReset = () => {
+    setSearchName('')
+  }
+
+  // Filter by search name
+  const filteredMenus = searchName
+    ? flatMenus.filter(m => m.name.toLowerCase().includes(searchName.toLowerCase()))
+    : flatMenus
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">菜单管理</h2>
-        <Button onClick={openCreate}>
-          <Plus className="size-4" />
-          新增菜单
-        </Button>
+      {/* Page Title */}
+      <div>
+        <h1 className="text-xl font-semibold text-gray-800">菜单管理</h1>
+        <p className="mt-0.5 text-sm text-gray-500">管理系统菜单结构与权限标识</p>
       </div>
 
+      {/* Filter Bar */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="搜索菜单名称"
+                value={searchName}
+                onChange={e => setSearchName(e.target.value)}
+                className="w-56 pl-9"
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={handleReset}>
+              <RotateCcw className="size-4" />重置
+            </Button>
+            <div className="flex-1" />
+            <Button onClick={openCreate}>
+              <Plus className="size-4" />新增菜单
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
       <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[200px]">名称</TableHead>
+              <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+                <TableHead className="min-w-[200px] pl-4">名称</TableHead>
                 <TableHead>类型</TableHead>
                 <TableHead>路由路径</TableHead>
                 <TableHead>图标</TableHead>
                 <TableHead>权限标识</TableHead>
                 <TableHead>排序</TableHead>
                 <TableHead>状态</TableHead>
-                <TableHead className="text-right">操作</TableHead>
+                <TableHead className="pr-4 text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={8} className="h-24 text-center">
-                    <Loader2 className="mx-auto size-6 animate-spin" />
+                    <Loader2 className="mx-auto size-6 animate-spin text-gray-400" />
                   </TableCell>
                 </TableRow>
-              ) : flatMenus.length === 0 ? (
+              ) : filteredMenus.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-24 text-center text-gray-400">
                     暂无菜单数据
                   </TableCell>
                 </TableRow>
               ) : (
-                flatMenus.map((menu) => {
-                  const typeInfo = TYPE_LABELS[menu.type] || { text: '未知', variant: 'outline' as const }
+                filteredMenus.map((menu) => {
+                  const typeInfo = TYPE_LABELS[menu.type] || { text: '未知', className: 'bg-gray-100 text-gray-600' }
                   return (
-                    <TableRow key={menu.id}>
-                      <TableCell>
+                    <TableRow key={menu.id} className="even:bg-gray-50/40">
+                      <TableCell className="pl-4">
                         <div className="flex items-center gap-1" style={{ paddingLeft: `${menu.depth * 20}px` }}>
                           {menu.hasChildren ? (
-                            <button onClick={() => toggleExpand(menu.id)} className="p-0.5 hover:bg-accent rounded">
+                            <button onClick={() => toggleExpand(menu.id)} className="rounded p-0.5 hover:bg-gray-100">
                               {expanded.has(menu.id) ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                             </button>
                           ) : (
                             <span className="w-5" />
                           )}
-                          <span>{menu.name}</span>
+                          <span className="font-medium text-gray-700">{menu.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell><Badge variant={typeInfo.variant}>{typeInfo.text}</Badge></TableCell>
-                      <TableCell className="text-muted-foreground">{menu.path || '-'}</TableCell>
-                      <TableCell className="text-muted-foreground">{menu.icon || '-'}</TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">{menu.permission || '-'}</TableCell>
-                      <TableCell>{menu.sortOrder}</TableCell>
                       <TableCell>
-                        <Badge variant={menu.status === 1 ? 'success' : 'destructive'}>
-                          {menu.status === 1 ? '启用' : '禁用'}
-                        </Badge>
+                        <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', typeInfo.className)}>
+                          {typeInfo.text}
+                        </span>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(menu)}>
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openDelete(menu)}>
-                            <Trash2 className="size-4 text-destructive" />
-                          </Button>
+                      <TableCell className="text-gray-500">{menu.path || '-'}</TableCell>
+                      <TableCell className="text-gray-500">{menu.icon || '-'}</TableCell>
+                      <TableCell className="font-mono text-xs text-gray-500">{menu.permission || '-'}</TableCell>
+                      <TableCell className="text-gray-600">{menu.sortOrder}</TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center gap-1.5 text-sm">
+                          <span className={cn('size-2 rounded-full', menu.status === 1 ? 'bg-green-500' : 'bg-red-400')} />
+                          {menu.status === 1 ? '启用' : '禁用'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="pr-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => openEdit(menu)}
+                            className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+                          >
+                            编辑
+                          </button>
+                          <button
+                            onClick={() => openDelete(menu)}
+                            className="rounded-md px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+                          >
+                            删除
+                          </button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -222,13 +269,13 @@ export function MenuPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md rounded-xl">
           <DialogHeader>
             <DialogTitle>{editingMenu ? '编辑菜单' : '新增菜单'}</DialogTitle>
             <DialogDescription>{editingMenu ? '修改菜单信息' : '创建新的菜单项'}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>父菜单</Label>
               <Select value={String(form.parentId)} onValueChange={v => setForm({ ...form, parentId: Number(v) })}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -239,7 +286,7 @@ export function MenuPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>菜单类型</Label>
               <Select value={String(form.type)} onValueChange={v => setForm({ ...form, type: Number(v) })}>
                 <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -250,32 +297,54 @@ export function MenuPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="name">菜单名称</Label>
-              <Input id="name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-0.5">
+                菜单名称 <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                value={form.name}
+                placeholder="请输入菜单名称"
+                onChange={e => setForm({ ...form, name: e.target.value })}
+              />
             </div>
             {form.type !== 3 && (
-              <div className="space-y-2">
-                <Label htmlFor="path">路由路径</Label>
-                <Input id="path" value={form.path} onChange={e => setForm({ ...form, path: e.target.value })} placeholder="/users" />
+              <div className="space-y-1.5">
+                <Label>路由路径</Label>
+                <Input
+                  value={form.path}
+                  placeholder="如: /users"
+                  onChange={e => setForm({ ...form, path: e.target.value })}
+                />
               </div>
             )}
             {form.type !== 3 && (
-              <div className="space-y-2">
-                <Label htmlFor="icon">图标</Label>
-                <Input id="icon" value={form.icon} onChange={e => setForm({ ...form, icon: e.target.value })} placeholder="Users" />
+              <div className="space-y-1.5">
+                <Label>图标</Label>
+                <Input
+                  value={form.icon}
+                  placeholder="如: Users"
+                  onChange={e => setForm({ ...form, icon: e.target.value })}
+                />
               </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="permission">权限标识</Label>
-              <Input id="permission" value={form.permission} onChange={e => setForm({ ...form, permission: e.target.value })} placeholder="user:create" />
+            <div className="space-y-1.5">
+              <Label>权限标识</Label>
+              <Input
+                value={form.permission}
+                placeholder="如: user:create"
+                onChange={e => setForm({ ...form, permission: e.target.value })}
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="sortOrder">排序</Label>
-                <Input id="sortOrder" type="number" value={form.sortOrder} onChange={e => setForm({ ...form, sortOrder: Number(e.target.value) })} />
+              <div className="space-y-1.5">
+                <Label>排序</Label>
+                <Input
+                  type="number"
+                  value={form.sortOrder}
+                  onChange={e => setForm({ ...form, sortOrder: Number(e.target.value) })}
+                />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>状态</Label>
                 <Select value={String(form.status)} onValueChange={v => setForm({ ...form, status: Number(v) })}>
                   <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
@@ -297,20 +366,36 @@ export function MenuPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
+      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm rounded-xl">
           <DialogHeader>
-            <DialogTitle>确认删除</DialogTitle>
-            <DialogDescription>
-              确定要删除菜单「{deleteTarget?.name}」吗？此操作不可撤销。
+            <DialogTitle className="flex items-center gap-2">
+              <span className="flex size-8 items-center justify-center rounded-full bg-red-100">
+                <AlertTriangle className="size-4 text-red-600" />
+              </span>
+              删除菜单
+            </DialogTitle>
+            <DialogDescription className="pt-1">
+              确定要删除菜单「{deleteTarget?.name}」吗？此操作不可撤销，子菜单也将一并删除。
             </DialogDescription>
           </DialogHeader>
+          {deleteTarget && (
+            <div className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
+                <LayoutDashboard className="size-5" />
+              </div>
+              <div>
+                <div className="font-medium text-gray-800">{deleteTarget.name}</div>
+                <div className="text-sm text-gray-400">{deleteTarget.path || '无路径'}</div>
+              </div>
+            </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>取消</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
               {submitting && <Loader2 className="size-4 animate-spin" />}
-              删除
+              确认删除
             </Button>
           </DialogFooter>
         </DialogContent>
