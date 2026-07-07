@@ -16,7 +16,7 @@ class UserRemoteDataSource {
     String? avatar,
   }) async {
     final response = await _dioClient.put(
-      '/users/profile',
+      '/app/users/profile',
       data: {
         'nickname': ?nickname,
         'email': ?email,
@@ -29,7 +29,7 @@ class UserRemoteDataSource {
   /// 修改密码
   Future<void> changePassword(String oldPassword, String newPassword) async {
     await _dioClient.put(
-      '/users/password',
+      '/app/users/password',
       data: {
         'oldPassword': oldPassword,
         'newPassword': newPassword,

@@ -436,6 +436,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         ),
         prefixIcon: Icon(icon, color: AppColors.secondaryText, size: 22),
         suffixIcon: suffixIcon,
+        helperText: ' ',
         filled: true,
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(

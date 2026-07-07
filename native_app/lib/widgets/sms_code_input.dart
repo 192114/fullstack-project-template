@@ -180,6 +180,7 @@ class _SmsCodeInputState extends ConsumerState<SmsCodeInput> {
           ),
         ),
         filled: true,
+        helperText: ' ',
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,

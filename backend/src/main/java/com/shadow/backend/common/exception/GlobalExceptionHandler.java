@@ -33,8 +33,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Result<Void>> handleBusinessException(BusinessException ex) {
         log.warn("业务异常: code={}, message={}", ex.getCode(), ex.getMessage());
-        HttpStatus status = resolveBusinessHttpStatus(ex.getCode());
-        return ResponseEntity.status(status).body(Result.fail(ex.getCode(), ex.getMessage()));
+        return ResponseEntity.ok(Result.fail(ex.getCode(), ex.getMessage()));
     }
 
     @ExceptionHandler(NotLoginException.class)
@@ -123,11 +122,4 @@ public class GlobalExceptionHandler {
         return HttpStatus.BAD_REQUEST;
     }
 
-    private HttpStatus resolveBusinessHttpStatus(int code) {
-        HttpStatus status = HttpStatus.resolve(code);
-        if (status != null) {
-            return status;
-        }
-        return HttpStatus.BAD_REQUEST;
-    }
 }

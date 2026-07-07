@@ -372,6 +372,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
         ),
         prefixIcon: Icon(icon, color: AppColors.secondaryText, size: 22),
         suffixIcon: suffixIcon,
+        helperText: ' ',
         filled: true,
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(

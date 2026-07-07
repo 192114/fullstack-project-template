@@ -73,25 +73,19 @@ class _LoginPageState extends ConsumerState<LoginPage>
   Future<void> _loginByPassword() async {
     if (!_passwordFormKey.currentState!.validate()) return;
 
-    final success = await ref
+    await ref
         .read(loginViewModelProvider.notifier)
         .loginByPassword(_phoneController.text, _passwordController.text);
-
-    if (!success && mounted) {
-      _showError(ref.read(loginViewModelProvider).errorMessage);
-    }
+    // 错误提示由 ref.listen 统一处理，避免重复弹出 SnackBar
   }
 
   Future<void> _loginBySms() async {
     if (!_smsFormKey.currentState!.validate()) return;
 
-    final success = await ref
+    await ref
         .read(loginViewModelProvider.notifier)
         .loginBySms(_smsPhoneController.text, _smsCodeController.text);
-
-    if (!success && mounted) {
-      _showError(ref.read(loginViewModelProvider).errorMessage);
-    }
+    // 错误提示由 ref.listen 统一处理，避免重复弹出 SnackBar
   }
 
   void _showError(String? message) {
@@ -477,6 +471,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
         ),
         prefixIcon: Icon(icon, color: AppColors.secondaryText, size: 22),
         suffixIcon: suffixIcon,
+        helperText: ' ',
         filled: true,
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(

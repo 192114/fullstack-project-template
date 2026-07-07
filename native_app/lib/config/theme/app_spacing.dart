@@ -52,8 +52,8 @@ class AppSpacing {
   /// 列表项之间的间距
   static const double listItemSpacing = 12;
 
-  /// 表单字段之间的间距
-  static const double formFieldSpacing = 16;
+  /// 表单字段之间的间距（helperText 已预留错误文本空间，间距设为 0）
+  static const double formFieldSpacing = 0;
 
   /// 卡片内边距
   static const double cardPadding = 16;

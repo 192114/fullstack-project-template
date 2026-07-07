@@ -77,49 +77,68 @@ class ApiException implements Exception {
     final statusCode = response?.statusCode ?? 0;
     final data = response?.data;
 
+    // 优先从响应体中提取业务 code 和 message
+    final business = _extractBusinessInfo(data);
+    final bizCode = business?['code'] as int?;
+    final bizMessage = business?['message'] as String?;
+
     switch (statusCode) {
       case 400:
+        // 参数校验异常：优先使用响应体中的具体错误信息
         return ApiException(
-          code: 400,
+          code: bizCode ?? 400,
           type: ApiExceptionType.unknown,
-          message: '请求参数错误',
+          message: bizMessage ?? '请求参数错误',
           data: data,
         );
       case 401:
         return ApiException(
           code: 401,
           type: ApiExceptionType.unauthorized,
-          message: '登录已过期，请重新登录',
+          message: bizMessage ?? '登录已过期，请重新登录',
           data: data,
         );
       case 403:
         return ApiException(
           code: 403,
           type: ApiExceptionType.unauthorized,
-          message: '没有访问权限',
+          message: bizMessage ?? '没有访问权限',
           data: data,
         );
       case 404:
         return ApiException(
           code: 404,
           type: ApiExceptionType.unknown,
-          message: '请求的资源不存在',
+          message: bizMessage ?? '请求的资源不存在',
           data: data,
         );
       case >= 500:
         return ApiException(
           code: statusCode,
           type: ApiExceptionType.server,
-          message: '服务器错误 ($statusCode)',
+          message: bizMessage ?? '服务器错误 ($statusCode)',
           data: data,
         );
       default:
         return ApiException(
           code: statusCode,
           type: ApiExceptionType.unknown,
-          message: '请求失败 ($statusCode)',
+          message: bizMessage ?? '请求失败 ($statusCode)',
           data: data,
         );
     }
+  }
+
+  /// 从响应体中提取业务 code 和 message
+  /// 兼容后端 Result 包装类: {"code": 10004, "msg": "...", "data": null}
+  static Map<String, dynamic>? _extractBusinessInfo(dynamic data) {
+    if (data is Map) {
+      final code = data['code'];
+      final message = data['msg'] ?? data['message'];
+      if (code != null && message is String) {
+        return {'code': code is int ? code : int.tryParse(code.toString()), 'message': message};
+      }
+    }
+    return null;
   }
 }

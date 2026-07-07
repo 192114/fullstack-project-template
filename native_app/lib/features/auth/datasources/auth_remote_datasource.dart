@@ -12,7 +12,7 @@ class AuthRemoteDataSource {
   /// 发送验证码
   Future<void> sendCode(String phone, String scene) async {
     await _dioClient.post(
-      '/auth/send-code',
+      '/app/auth/send-code',
       data: {'phone': phone, 'scene': scene},
     );
   }
@@ -23,7 +23,7 @@ class AuthRemoteDataSource {
     String password,
   ) async {
     final response = await _dioClient.post(
-      '/auth/login/password',
+      '/app/auth/login/password',
       data: {'phone': phone, 'password': password},
     );
     return _parseResponseData(response);
@@ -32,7 +32,7 @@ class AuthRemoteDataSource {
   /// 验证码登录
   Future<Map<String, dynamic>> loginBySms(String phone, String code) async {
     final response = await _dioClient.post(
-      '/auth/login/sms',
+      '/app/auth/login/sms',
       data: {'phone': phone, 'code': code},
     );
     return _parseResponseData(response);
@@ -46,7 +46,7 @@ class AuthRemoteDataSource {
     String? nickname,
   }) async {
     final response = await _dioClient.post(
-      '/auth/register',
+      '/app/auth/register',
       data: {
         'phone': phone,
         'password': password,
@@ -60,7 +60,7 @@ class AuthRemoteDataSource {
   /// 刷新 Token
   Future<Map<String, dynamic>> refreshToken(String refreshToken) async {
     final response = await _dioClient.post(
-      '/auth/refresh',
+      '/app/auth/refresh',
       data: {'refreshToken': refreshToken},
     );
     return _parseResponseData(response);
@@ -68,12 +68,12 @@ class AuthRemoteDataSource {
 
   /// 退出登录
   Future<void> logout() async {
-    await _dioClient.post('/auth/logout');
+    await _dioClient.post('/app/auth/logout');
   }
 
   /// 获取当前用户信息
   Future<Map<String, dynamic>> getCurrentUser() async {
-    final response = await _dioClient.get('/auth/me');
+    final response = await _dioClient.get('/app/auth/me');
     return _parseResponseData(response);
   }
 
@@ -84,7 +84,7 @@ class AuthRemoteDataSource {
     String code,
   ) async {
     await _dioClient.post(
-      '/auth/reset-password',
+      '/app/auth/reset-password',
       data: {
         'phone': phone,
         'newPassword': newPassword,

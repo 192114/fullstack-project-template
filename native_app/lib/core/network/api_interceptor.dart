@@ -120,7 +120,7 @@ class ApiInterceptor extends Interceptor {
 
       // TODO: 替换为实际的刷新 Token 接口
       final response = await _dio.post(
-        '/auth/refresh',
+        '/app/auth/refresh',
         data: {'refreshToken': refreshToken},
         options: Options(
           headers: {'Authorization': ''}, // 清除 Authorization Header
