@@ -7,6 +7,7 @@ import 'package:native_app/config/theme/app_radius.dart';
 import 'package:native_app/config/theme/app_spacing.dart';
 import 'package:native_app/config/theme/app_typography.dart';
 import 'package:native_app/core/router/app_router.dart';
+import 'package:native_app/shared/widgets/message/message.dart';
 import 'package:native_app/widgets/sms_code_input.dart';
 
 import '../view_model/auth_provider.dart';
@@ -90,13 +91,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
 
   void _showError(String? message) {
     if (message == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 3),
-        backgroundColor: AppColors.error,
-      ),
-    );
+    AppMessage.error(message);
   }
 
   @override

@@ -75,6 +75,28 @@ class AppColors {
   /// 信息色
   static const Color info = Color(0xFF2196F3);
 
+  // ==================== 消息组件配色 ====================
+  /// 消息 - 成功图标色
+  static const Color messageSuccess = Color(0xFF16A34A);
+  /// 消息 - 错误图标色
+  static const Color messageError = Color(0xFFDC2626);
+  /// 消息 - 警告图标色
+  static const Color messageWarning = Color(0xFFD97706);
+  /// 消息 - 信息图标色
+  static const Color messageInfo = Color(0xFF2563EB);
+  /// 消息 - 边框色
+  static const Color messageBorder = Color(0xFFE5E7EB);
+  /// 消息 - 标题色
+  static const Color messageTitle = Color(0xFF111827);
+  /// 消息 - 描述色
+  static const Color messageDescription = Color(0xFF6B7280);
+  /// 消息 - 背景色
+  static const Color messageBackground = Color(0xFFFFFFFF);
+  /// 消息 - 毛玻璃背景色 (70% 白色透明)
+  static const Color messageBlurBackground = Color(0xB3FFFFFF);
+  /// 消息 - 阴影色
+  static const Color messageShadow = Color(0x14000000);
+
   // ==================== ColorScheme ====================
   /// 亮色模式 ColorScheme
   static ColorScheme get lightColorScheme => const ColorScheme(

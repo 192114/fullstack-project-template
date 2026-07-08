@@ -7,6 +7,7 @@ import 'package:native_app/config/theme/app_radius.dart';
 import 'package:native_app/config/theme/app_spacing.dart';
 import 'package:native_app/config/theme/app_typography.dart';
 import 'package:native_app/core/router/app_router.dart';
+import 'package:native_app/shared/widgets/message/message.dart';
 import 'package:native_app/widgets/sms_code_input.dart';
 
 import '../view_model/auth_provider.dart';
@@ -93,38 +94,24 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
         );
 
     if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('密码重置成功，请重新登录'),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 2),
-        ),
+      AppMessage.success(
+        '密码重置成功',
+        description: '请重新登录',
+        duration: const Duration(seconds: 2),
       );
       context.go(RoutePaths.login);
     } else if (mounted) {
       final errorMessage =
           ref.read(resetPasswordViewModelProvider).errorMessage;
       if (errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        AppMessage.error(errorMessage);
       }
     }
   }
 
   void _showError(String? message) {
     if (message == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.error,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    AppMessage.error(message);
   }
 
   @override

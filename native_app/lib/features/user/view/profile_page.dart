@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:native_app/config/theme/app_colors.dart';
 import 'package:native_app/config/theme/app_spacing.dart';
 import 'package:native_app/config/theme/app_typography.dart';
+import 'package:native_app/shared/widgets/message/message.dart';
 
 import '../models/user_model.dart';
 import '../view_model/profile_view_model.dart';
@@ -28,12 +29,7 @@ class ProfilePage extends ConsumerWidget {
     ref.listen<ProfileState>(profileViewModelProvider, (prev, next) {
       if (next.errorMessage != null &&
           next.errorMessage != prev?.errorMessage) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.errorMessage!),
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        AppMessage.error(next.errorMessage!);
       }
     });
 

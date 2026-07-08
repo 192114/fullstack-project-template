@@ -6,6 +6,7 @@ import 'package:native_app/config/theme/app_colors.dart';
 import 'package:native_app/config/theme/app_radius.dart';
 import 'package:native_app/config/theme/app_spacing.dart';
 import 'package:native_app/config/theme/app_typography.dart';
+import 'package:native_app/shared/widgets/message/message.dart';
 import 'package:native_app/widgets/sms_code_input.dart';
 
 import '../view_model/auth_provider.dart';
@@ -77,13 +78,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('请先阅读并同意用户协议和隐私政策'),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      AppMessage.warning('请先阅读并同意用户协议和隐私政策');
       return;
     }
 
@@ -98,26 +93,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     if (!success && mounted) {
       final errorMessage = ref.read(registerViewModelProvider).errorMessage;
       if (errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        AppMessage.error(errorMessage);
       }
     }
   }
 
   void _showError(String? message) {
     if (message == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.error,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    AppMessage.error(message);
   }
 
   @override

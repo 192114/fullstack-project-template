@@ -7,6 +7,7 @@ import 'package:native_app/config/theme/app_radius.dart';
 import 'package:native_app/config/theme/app_typography.dart';
 import 'package:native_app/core/network/api_exception.dart';
 import 'package:native_app/features/auth/view_model/auth_provider.dart';
+import 'package:native_app/shared/widgets/message/message.dart';
 
 /// 短信验证码输入组件
 /// 包含验证码输入框和发送验证码按钮（60 秒倒计时）
@@ -81,29 +82,11 @@ class _SmsCodeInputState extends ConsumerState<SmsCodeInput> {
           .read(authRepositoryProvider)
           .sendCode(_phone, widget.scene);
       _startCountdown();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('验证码已发送'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      AppMessage.success('验证码已发送', duration: const Duration(seconds: 2));
     } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
+      AppMessage.error(e.message);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('发送验证码失败: $e')),
-        );
-      }
+      AppMessage.error('发送验证码失败', description: '$e');
     } finally {
       if (mounted) setState(() => _isSending = false);
     }

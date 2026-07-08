@@ -5,6 +5,7 @@ import 'package:native_app/features/auth/view/register_page.dart';
 import 'package:native_app/features/auth/view/reset_password_page.dart';
 import 'package:native_app/features/user/view/change_password_page.dart';
 import 'package:native_app/features/user/view/profile_page.dart';
+import 'package:native_app/shared/widgets/message/message.dart';
 
 import 'auth_notifier.dart';
 
@@ -49,12 +50,13 @@ const _publicRoutes = {
 class AppRouter {
   AppRouter._();
 
-  static final _rootNavigatorKey = GlobalKey<NavigatorState>();
-
   /// 创建 GoRouter
+  ///
+  /// 使用 [AppMessage.navigatorKey] 作为根 Navigator Key，
+  /// 这样全局消息提示组件可以访问 Overlay。
   static GoRouter createRouter() {
     return GoRouter(
-      navigatorKey: _rootNavigatorKey,
+      navigatorKey: AppMessage.navigatorKey,
       initialLocation: RoutePaths.home,
       debugLogDiagnostics: true,
 
