@@ -97,6 +97,20 @@ class AppColors {
   /// 消息 - 阴影色
   static const Color messageShadow = Color(0x14000000);
 
+  // ==================== 对话框配色 ====================
+  /// 对话框 - 按钮主色
+  static const Color dialogPrimary = Color(0xFF1F60FF);
+  /// 对话框 - 危险按钮色
+  static const Color dialogDanger = Color(0xFFDC2626);
+  /// 对话框 - 蓝色调阴影
+  static const Color dialogShadow = Color(0x1A1F60FF);
+  /// 对话框 - 背景遮罩 (40% 黑色透明)
+  static const Color dialogBackdrop = Color(0x66000000);
+  /// 对话框 - 次要按钮边框色
+  static const Color dialogButtonBorder = Color(0xFFE5E7EB);
+  /// 对话框 - 次要按钮文字色
+  static const Color dialogButtonText = Color(0xFF111827);
+
   // ==================== ColorScheme ====================
   /// 亮色模式 ColorScheme
   static ColorScheme get lightColorScheme => const ColorScheme(
