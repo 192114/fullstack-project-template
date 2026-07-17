@@ -19,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
@@ -75,6 +77,7 @@ public class UserServiceImpl implements UserService {
         Page<User> page = new Page<>(query.getPage(), query.getSize());
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
                 .like(StringUtils.hasText(query.getUsername()), User::getUsername, query.getUsername())
+                .eq(query.getAuditStatus() != null, User::getAuditStatus, query.getAuditStatus())
                 .orderByDesc(User::getId);
         Page<User> userPage = userMapper.selectPage(page, wrapper);
         Page<UserVO> resultPage = new Page<>(userPage.getCurrent(), userPage.getSize(), userPage.getTotal());
@@ -119,6 +122,19 @@ public class UserServiceImpl implements UserService {
         userMapper.updateById(user);
     }
 
+    @Override
+    public UserVO audit(Long id, Integer auditStatus, String auditRemark) {
+        User user = getEntityById(id);
+        if (user.getAuditStatus() != null && user.getAuditStatus() != 0) {
+            throw new BusinessException(UserResultCode.USER_ALREADY_AUDITED);
+        }
+        user.setAuditStatus(auditStatus);
+        user.setAuditRemark(auditRemark);
+        user.setAuditTime(LocalDateTime.now());
+        userMapper.updateById(user);
+        return toVO(user);
+    }
+
     private User getEntityById(Long id) {
         User user = userMapper.selectById(id);
         if (user == null) {
@@ -140,6 +156,9 @@ public class UserServiceImpl implements UserService {
         vo.setAvatar(user.getAvatar());
         vo.setEmail(user.getEmail());
         vo.setStatus(user.getStatus());
+        vo.setAuditStatus(user.getAuditStatus());
+        vo.setAuditRemark(user.getAuditRemark());
+        vo.setAuditTime(user.getAuditTime());
         vo.setCreateTime(user.getCreateTime());
         vo.setUpdateTime(user.getUpdateTime());
         return vo;

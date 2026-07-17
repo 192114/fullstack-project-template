@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Plus, Pencil, Trash2, Loader2, Shield,
+  Plus, Loader2, Shield,
   Search, RotateCcw, AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -96,7 +96,7 @@ export function RolePage() {
 
   const openEdit = (role: RoleVO) => {
     setEditRole(role)
-    setForm({ name: role.name, sortOrder: role.sortOrder, remark: role.remark || '' })
+    setForm({ name: role.name, code: role.code, sortOrder: role.sortOrder, remark: role.remark || '' })
     setDialogOpen(true)
   }
 

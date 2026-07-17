@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:native_app/features/auth/view/account_review_page.dart';
 import 'package:native_app/features/auth/view/login_page.dart';
 import 'package:native_app/features/auth/view/register_page.dart';
 import 'package:native_app/features/auth/view/reset_password_page.dart';
+import 'package:native_app/features/auth/view/resubmit_page.dart';
 import 'package:native_app/features/user/view/change_password_page.dart';
 import 'package:native_app/features/user/view/profile_page.dart';
 import 'package:native_app/shared/widgets/message/message.dart';
@@ -28,6 +30,12 @@ class RoutePaths {
   /// 重置密码页 (免登录)
   static const String resetPassword = '/reset-password';
 
+  /// 审核状态页 (免登录)
+  static const String accountReview = '/account-review';
+
+  /// 重新提交审核页 (免登录)
+  static const String resubmit = '/resubmit';
+
   /// 个人资料页
   static const String profile = '/profile';
 
@@ -44,6 +52,8 @@ const _publicRoutes = {
   RoutePaths.welcome,
   RoutePaths.register,
   RoutePaths.resetPassword,
+  RoutePaths.accountReview,
+  RoutePaths.resubmit,
 };
 
 /// 应用路由配置
@@ -118,6 +128,22 @@ class AppRouter {
         GoRoute(
           path: RoutePaths.resetPassword,
           builder: (context, state) => const ResetPasswordPage(),
+        ),
+
+        // 审核状态页
+        GoRoute(
+          path: RoutePaths.accountReview,
+          builder: (context, state) => AccountReviewPage(
+            phone: state.uri.queryParameters['phone'] ?? '',
+          ),
+        ),
+
+        // 重新提交审核页
+        GoRoute(
+          path: RoutePaths.resubmit,
+          builder: (context, state) => ResubmitPage(
+            phone: state.uri.queryParameters['phone'] ?? '',
+          ),
         ),
 
         // 修改密码页

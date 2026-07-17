@@ -85,24 +85,45 @@ class AuthRemoteDataSource {
   ) async {
     await _dioClient.post(
       '/app/auth/reset-password',
-      data: {
-        'phone': phone,
-        'newPassword': newPassword,
-        'code': code,
-      },
+      data: {'phone': phone, 'newPassword': newPassword, 'code': code},
     );
   }
 
+  /// 查询审核状态
+  Future<Map<String, dynamic>> getAuditStatus(String phone) async {
+    final response = await _dioClient.get(
+      '/app/auth/audit-status',
+      queryParameters: {'phone': phone},
+    );
+    return _parseResponseData(response);
+  }
+
+  /// 驳回后重新提交审核
+  Future<Map<String, dynamic>> resubmit(
+    String phone,
+    String password,
+    String code, {
+    String? nickname,
+  }) async {
+    final response = await _dioClient.post(
+      '/app/auth/resubmit',
+      data: {
+        'phone': phone,
+        'password': password,
+        'code': code,
+        'nickname': ?nickname,
+      },
+    );
+    return _parseResponseData(response);
+  }
+
   /// 解析响应数据
-  /// 统一处理 Result<T> 格式，提取 data 字段
+  /// 统一处理 `Result<T>` 格式，提取 data 字段
   Map<String, dynamic> _parseResponseData(Response<dynamic> response) {
     final body = response.data as Map<String, dynamic>;
     final code = body['code'] as int?;
     if (code != 200) {
-      throw ApiException(
-        code: code,
-        message: body['msg'] as String? ?? '未知错误',
-      );
+      throw ApiException(code: code, message: body['msg'] as String? ?? '未知错误');
     }
     return body['data'] as Map<String, dynamic>;
   }

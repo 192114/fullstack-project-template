@@ -7,6 +7,7 @@ import 'package:native_app/config/theme/app_radius.dart';
 import 'package:native_app/config/theme/app_spacing.dart';
 import 'package:native_app/config/theme/app_typography.dart';
 import 'package:native_app/core/router/app_router.dart';
+import 'package:native_app/shared/widgets/dialog/dialog.dart';
 import 'package:native_app/shared/widgets/message/message.dart';
 import 'package:native_app/widgets/sms_code_input.dart';
 
@@ -94,6 +95,28 @@ class _LoginPageState extends ConsumerState<LoginPage>
     AppMessage.error(message);
   }
 
+  Future<void> _showAuditErrorDialog(
+    int errorCode,
+    String message,
+    String phone,
+  ) async {
+    final isRejected = errorCode == 10018;
+    final index = await AppDialog.show(
+      type: isRejected ? DialogType.warning : DialogType.info,
+      title: isRejected ? '审核未通过' : '账号审核中',
+      message: message,
+      actions: [
+        DialogAction.secondary(text: '知道了'),
+        DialogAction.primary(text: '查看审核状态'),
+      ],
+      showClose: false,
+      barrierDismissible: true,
+    );
+    if (index == 1 && mounted) {
+      context.push('/account-review?phone=$phone');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loginState = ref.watch(loginViewModelProvider);
@@ -101,7 +124,15 @@ class _LoginPageState extends ConsumerState<LoginPage>
     ref.listen<LoginState>(loginViewModelProvider, (prev, next) {
       if (next.errorMessage != null &&
           next.errorMessage != prev?.errorMessage) {
-        _showError(next.errorMessage);
+        // 审核相关错误码，显示 Dialog 引导用户查看审核状态
+        if (next.errorCode == 10017 || next.errorCode == 10018) {
+          final phone = _tabController.index == 0
+              ? _phoneController.text
+              : _smsPhoneController.text;
+          _showAuditErrorDialog(next.errorCode!, next.errorMessage!, phone);
+        } else {
+          _showError(next.errorMessage);
+        }
       }
     });
 

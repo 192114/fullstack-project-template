@@ -15,6 +15,7 @@ export interface PageResult<T = unknown> {
   total: number
   size: number
   current: number
+  pages: number
 }
 
 /** Admin login request */
@@ -49,8 +50,17 @@ export interface AppUserInfo {
   avatar: string | null
   email: string | null
   status: number
+  auditStatus: number
+  auditRemark: string | null
+  auditTime: string | null
   createTime: string
   updateTime: string
+}
+
+/** 审核用户请求 */
+export interface AuditUserRequest {
+  auditStatus: number
+  auditRemark?: string
 }
 
 // ======================== RBAC ========================

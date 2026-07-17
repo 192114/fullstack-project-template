@@ -31,6 +31,12 @@ public class User {
 
     private Integer status;
 
+    private Integer auditStatus;
+
+    private String auditRemark;
+
+    private java.time.LocalDateTime auditTime;
+
     @TableLogic
     private Integer deleted;
 

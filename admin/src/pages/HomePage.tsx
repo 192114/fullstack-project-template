@@ -350,7 +350,7 @@ export function HomePage() {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <RTooltip formatter={(value: number) => `${value}%`} />
+                    <RTooltip formatter={(value) => `${value}%`} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>

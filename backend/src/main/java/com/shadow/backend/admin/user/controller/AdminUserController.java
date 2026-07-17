@@ -3,6 +3,7 @@ package com.shadow.backend.admin.user.controller;
 import com.shadow.backend.common.response.PageResult;
 import com.shadow.backend.common.response.Result;
 import com.shadow.backend.user.dto.CreateUserRequest;
+import com.shadow.backend.user.dto.AuditUserRequest;
 import com.shadow.backend.user.dto.UpdateUserRequest;
 import com.shadow.backend.user.dto.UserPageQuery;
 import com.shadow.backend.user.service.UserService;
@@ -44,6 +45,11 @@ public class AdminUserController {
     @PostMapping
     public Result<UserVO> create(@Valid @RequestBody CreateUserRequest request) {
         return Result.success(userService.create(request));
+    }
+
+    @PostMapping("/{id}/audit")
+    public Result<UserVO> audit(@PathVariable Long id, @Valid @RequestBody AuditUserRequest request) {
+        return Result.success(userService.audit(id, request.getAuditStatus(), request.getAuditRemark()));
     }
 
     @PutMapping("/{id}")

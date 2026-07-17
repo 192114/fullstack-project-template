@@ -6,36 +6,40 @@ import 'package:native_app/config/theme/app_colors.dart';
 import 'package:native_app/config/theme/app_radius.dart';
 import 'package:native_app/config/theme/app_spacing.dart';
 import 'package:native_app/config/theme/app_typography.dart';
+import 'package:native_app/core/router/app_router.dart';
 import 'package:native_app/shared/widgets/message/message.dart';
 import 'package:native_app/widgets/sms_code_input.dart';
 
 import '../view_model/auth_provider.dart';
-import '../view_model/register_view_model.dart';
+import '../view_model/resubmit_view_model.dart';
 
-/// 注册页
-/// 基于科研工作台设计稿：Banner + 下方表单，上下排布
-class RegisterPage extends ConsumerStatefulWidget {
-  const RegisterPage({super.key});
+/// 重新提交审核页
+/// 被驳回后用户可以修改注册信息重新提交审核
+class ResubmitPage extends ConsumerStatefulWidget {
+  final String phone;
+
+  const ResubmitPage({super.key, required this.phone});
 
   @override
-  ConsumerState<RegisterPage> createState() => _RegisterPageState();
+  ConsumerState<ResubmitPage> createState() => _ResubmitPageState();
 }
 
-class _RegisterPageState extends ConsumerState<RegisterPage> {
+class _ResubmitPageState extends ConsumerState<ResubmitPage> {
   final _formKey = GlobalKey<FormState>();
 
   final _phoneController = TextEditingController();
   final _codeController = TextEditingController();
+  final _nicknameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool _agreedToTerms = false;
 
   @override
   void initState() {
     super.initState();
+    _phoneController.text = widget.phone;
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -43,20 +47,27 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         statusBarBrightness: Brightness.light,
       ),
     );
+    // 加载审核信息，预填昵称
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(resubmitViewModelProvider.notifier)
+          .loadAuditInfo(widget.phone);
+    });
   }
 
   @override
   void dispose() {
     _phoneController.dispose();
     _codeController.dispose();
+    _nicknameController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  String? _validatePhone(String? value) {
-    if (value == null || value.isEmpty) return '请输入手机号';
-    if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(value)) return '手机号格式不正确';
+  String? _validateCode(String? value) {
+    if (value == null || value.isEmpty) return '请输入验证码';
+    if (value.length < 4) return '验证码格式不正确';
     return null;
   }
 
@@ -75,28 +86,27 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     return null;
   }
 
-  Future<void> _register() async {
+  Future<void> _resubmit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_agreedToTerms) {
-      AppMessage.warning('请先阅读并同意用户协议和隐私政策');
-      return;
-    }
 
     final phone = await ref
-        .read(registerViewModelProvider.notifier)
-        .register(
-          _phoneController.text,
+        .read(resubmitViewModelProvider.notifier)
+        .resubmit(
+          widget.phone,
           _passwordController.text,
           _codeController.text,
+          nickname: _nicknameController.text.trim().isEmpty
+              ? null
+              : _nicknameController.text.trim(),
         );
 
     if (phone != null && mounted) {
       AppMessage.success(
-        '注册成功',
+        '提交成功',
         description: '请等待管理员审核',
         duration: const Duration(seconds: 2),
       );
-      context.pushReplacement('/account-review?phone=$phone');
+      context.pop(true);
     }
   }
 
@@ -107,27 +117,34 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    final registerState = ref.watch(registerViewModelProvider);
+    final state = ref.watch(resubmitViewModelProvider);
 
-    ref.listen<RegisterState>(registerViewModelProvider, (prev, next) {
+    // 预填昵称
+    if (state.nickname != null && _nicknameController.text.isEmpty) {
+      _nicknameController.text = state.nickname!;
+    }
+
+    ref.listen<ResubmitState>(resubmitViewModelProvider, (prev, next) {
       if (next.errorMessage != null &&
           next.errorMessage != prev?.errorMessage) {
         _showError(next.errorMessage);
       }
     });
 
+    final isLoading = state.isLoading || state.isSubmitting;
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: Column(
         children: [
           _buildBrandingSection(),
-          Expanded(child: _buildRegisterCard(registerState.isLoading)),
+          Expanded(child: _buildFormCard(isLoading)),
         ],
       ),
     );
   }
 
-  /// Banner 区域 - 背景图延伸到状态栏 + 返回按钮 + 标语
+  /// Banner 区域
   Widget _buildBrandingSection() {
     final statusBarHeight = MediaQuery.paddingOf(context).top;
     return SizedBox(
@@ -137,7 +154,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         children: [
           Positioned.fill(
             child: Image.asset(
-              'assets/images/register_bg.png',
+              'assets/images/audit_bg.png',
               fit: BoxFit.cover,
             ),
           ),
@@ -154,32 +171,32 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 GestureDetector(
                   onTap: () => context.pop(),
                   child: Container(
-                    width: 24,
-                    height: 24,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.arrow_back,
-                      color: AppColors.darkText,
-                      size: 24,
+                      color: Colors.white,
+                      size: 22,
                     ),
                   ),
                 ),
                 const Spacer(),
                 Text(
-                  '创建账号',
+                  '修改信息',
                   style: AppTypography.titleLarge.copyWith(
-                    color: AppColors.darkText,
+                    color: Colors.white,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 SizedBox(height: AppSpacing.xs),
                 Text(
-                  '加入科研工作平台，开启高效科研之旅',
+                  '修改注册信息后重新提交审核',
                   style: AppTypography.bodyMedium.copyWith(
-                    color: AppColors.secondaryText,
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -190,8 +207,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     );
   }
 
-  /// 注册表单区域
-  Widget _buildRegisterCard(bool isLoading) {
+  /// 表单区域
+  Widget _buildFormCard(bool isLoading) {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     return Container(
       width: double.infinity,
@@ -209,7 +226,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '欢迎注册科研工作台',
+                '重新提交注册信息',
                 style: AppTypography.titleLarge.copyWith(
                   color: AppColors.darkText,
                   fontWeight: FontWeight.w700,
@@ -217,29 +234,40 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               ),
               SizedBox(height: AppSpacing.xs),
               Text(
-                '填写信息完成注册',
+                '请修改信息后重新提交',
                 style: AppTypography.bodyMedium.copyWith(
                   color: AppColors.secondaryText,
                 ),
               ),
               SizedBox(height: AppSpacing.md),
+              // 手机号（只读）
               _buildInputField(
                 controller: _phoneController,
-                hintText: '请输入手机号',
+                hintText: '手机号',
                 icon: Icons.smartphone_outlined,
                 keyboardType: TextInputType.phone,
-                validator: _validatePhone,
+                readOnly: true,
               ),
               SizedBox(height: AppSpacing.formFieldSpacing),
+              // 验证码
               SmsCodeInput(
                 codeController: _codeController,
                 phoneController: _phoneController,
                 scene: 'REGISTER',
+                validator: _validateCode,
               ),
               SizedBox(height: AppSpacing.formFieldSpacing),
+              // 昵称（可编辑）
+              _buildInputField(
+                controller: _nicknameController,
+                hintText: '请输入昵称（选填）',
+                icon: Icons.person_outline,
+              ),
+              SizedBox(height: AppSpacing.formFieldSpacing),
+              // 新密码
               _buildInputField(
                 controller: _passwordController,
-                hintText: '请设置密码（8-20位，包含字母和数字）',
+                hintText: '请设置新密码（8-20位，包含字母和数字）',
                 icon: Icons.lock_outline,
                 obscureText: _obscurePassword,
                 suffixIcon: IconButton(
@@ -257,6 +285,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 validator: _validatePassword,
               ),
               SizedBox(height: AppSpacing.formFieldSpacing),
+              // 确认密码
               _buildInputField(
                 controller: _confirmPasswordController,
                 hintText: '请再次输入密码',
@@ -278,70 +307,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 validator: _validateConfirmPassword,
               ),
               SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () =>
-                        setState(() => _agreedToTerms = !_agreedToTerms),
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: _agreedToTerms
-                              ? AppColors.primary
-                              : AppColors.outlineVariant,
-                          width: 1.5,
-                        ),
-                        borderRadius: BorderRadius.circular(4),
-                        color: _agreedToTerms
-                            ? AppColors.primary
-                            : Colors.transparent,
-                      ),
-                      child: _agreedToTerms
-                          ? const Icon(Icons.check, size: 12, color: Colors.white)
-                          : null,
-                    ),
-                  ),
-                  SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: Text.rich(
-                      TextSpan(
-                        text: '我已阅读并同意',
-                        style: AppTypography.bodySmall.copyWith(
-                          color: AppColors.secondaryText,
-                        ),
-                        children: [
-                          TextSpan(
-                            text: '《用户协议》',
-                            style: AppTypography.bodySmall.copyWith(
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          TextSpan(
-                            text: '和',
-                            style: AppTypography.bodySmall.copyWith(
-                              color: AppColors.secondaryText,
-                            ),
-                          ),
-                          TextSpan(
-                            text: '《隐私政策》',
-                            style: AppTypography.bodySmall.copyWith(
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: AppSpacing.md),
               SizedBox(
                 width: double.infinity,
                 height: 48,
                 child: FilledButton(
-                  onPressed: isLoading ? null : _register,
+                  onPressed: isLoading ? null : _resubmit,
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     shape: RoundedRectangleBorder(
@@ -358,7 +328,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           ),
                         )
                       : Text(
-                          '立即注册',
+                          '重新提交',
                           style: AppTypography.titleMedium.copyWith(
                             color: Colors.white,
                             fontSize: 16,
@@ -372,15 +342,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '已有账号？',
+                    '不想修改？',
                     style: AppTypography.bodyMedium.copyWith(
                       color: AppColors.secondaryText,
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => context.go('/login'),
+                    onTap: () => context.go(RoutePaths.login),
                     child: Text(
-                      '立即登录',
+                      '返回登录',
                       style: AppTypography.bodyMedium.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w500,
@@ -402,6 +372,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     required IconData icon,
     TextInputType? keyboardType,
     bool obscureText = false,
+    bool readOnly = false,
     Widget? suffixIcon,
     String? Function(String?)? validator,
   }) {
@@ -409,8 +380,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
+      readOnly: readOnly,
       style: AppTypography.bodyLarge.copyWith(
-        color: AppColors.darkText,
+        color: readOnly ? AppColors.secondaryText : AppColors.darkText,
         fontSize: 15,
       ),
       decoration: InputDecoration(
@@ -423,7 +395,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         suffixIcon: suffixIcon,
         helperText: ' ',
         filled: true,
-        fillColor: Colors.white,
+        fillColor: readOnly ? AppColors.background : Colors.white,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,

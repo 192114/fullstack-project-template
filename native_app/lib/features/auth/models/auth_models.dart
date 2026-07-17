@@ -102,3 +102,43 @@ abstract class ResetPasswordRequest with _$ResetPasswordRequest {
   factory ResetPasswordRequest.fromJson(Map<String, dynamic> json) =>
       _$ResetPasswordRequestFromJson(json);
 }
+
+/// 注册响应（不含 Token，仅返回用户信息）
+@freezed
+abstract class RegisterResponse with _$RegisterResponse {
+  const factory RegisterResponse({
+    required UserModel user,
+  }) = _RegisterResponse;
+
+  factory RegisterResponse.fromJson(Map<String, dynamic> json) =>
+      _$RegisterResponseFromJson(json);
+}
+
+/// 审核状态查询响应
+@freezed
+abstract class AuditStatusResponse with _$AuditStatusResponse {
+  const factory AuditStatusResponse({
+    required int auditStatus,
+    String? auditRemark,
+    String? nickname,
+    String? phone,
+    String? createTime,
+  }) = _AuditStatusResponse;
+
+  factory AuditStatusResponse.fromJson(Map<String, dynamic> json) =>
+      _$AuditStatusResponseFromJson(json);
+}
+
+/// 重新提交审核请求
+@freezed
+abstract class ResubmitRequest with _$ResubmitRequest {
+  const factory ResubmitRequest({
+    required String phone,
+    required String password,
+    required String code,
+    String? nickname,
+  }) = _ResubmitRequest;
+
+  factory ResubmitRequest.fromJson(Map<String, dynamic> json) =>
+      _$ResubmitRequestFromJson(json);
+}

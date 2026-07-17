@@ -5,12 +5,15 @@ import com.shadow.backend.auth.dto.LoginResponse;
 import com.shadow.backend.auth.dto.PasswordLoginRequest;
 import com.shadow.backend.auth.dto.RefreshTokenRequest;
 import com.shadow.backend.auth.dto.RegisterRequest;
+import com.shadow.backend.auth.dto.RegisterResponse;
+import com.shadow.backend.auth.dto.ResubmitRequest;
 import com.shadow.backend.auth.dto.ResetPasswordRequest;
 import com.shadow.backend.auth.dto.SendCodeRequest;
 import com.shadow.backend.auth.dto.SmsLoginRequest;
 import com.shadow.backend.auth.response.AuthResultCode;
 import com.shadow.backend.auth.service.AuthService;
 import com.shadow.backend.auth.service.SmsService;
+import com.shadow.backend.auth.vo.AuditStatusVO;
 import com.shadow.backend.auth.vo.RefreshTokenResponse;
 import com.shadow.backend.common.exception.BusinessException;
 import com.shadow.backend.common.response.Result;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -52,8 +56,18 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public Result<LoginResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public Result<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
         return Result.success(authService.register(request));
+    }
+
+    @GetMapping("/audit-status")
+    public Result<AuditStatusVO> getAuditStatus(@RequestParam String phone) {
+        return Result.success(authService.getAuditStatus(phone));
+    }
+
+    @PostMapping("/resubmit")
+    public Result<RegisterResponse> resubmit(@Valid @RequestBody ResubmitRequest request) {
+        return Result.success(authService.resubmit(request));
     }
 
     @PostMapping("/refresh")

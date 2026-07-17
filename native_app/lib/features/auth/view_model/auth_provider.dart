@@ -5,9 +5,11 @@ import 'package:native_app/core/network/token_manager.dart';
 import '../datasources/auth_remote_datasource.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/auth_repository_impl.dart';
+import 'account_review_view_model.dart';
 import 'login_view_model.dart';
 import 'register_view_model.dart';
 import 'reset_password_view_model.dart';
+import 'resubmit_view_model.dart';
 
 /// 认证远程数据源 Provider
 final authRemoteDataSourceProvider = Provider<AuthRemoteDataSource>((ref) {
@@ -34,3 +36,13 @@ final registerViewModelProvider =
 final resetPasswordViewModelProvider =
     NotifierProvider<ResetPasswordViewModel, ResetPasswordState>(
         ResetPasswordViewModel.new);
+
+/// 审核状态 ViewModel Provider
+final accountReviewViewModelProvider =
+    NotifierProvider<AccountReviewViewModel, AccountReviewState>(
+        AccountReviewViewModel.new);
+
+/// 重新提交审核 ViewModel Provider
+final resubmitViewModelProvider =
+    NotifierProvider<ResubmitViewModel, ResubmitState>(
+        ResubmitViewModel.new);

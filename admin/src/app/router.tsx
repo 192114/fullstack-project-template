@@ -12,6 +12,7 @@ import { HomePage } from '@/pages/HomePage'
 import { MenuPage } from '@/pages/MenuPage'
 import { RolePage } from '@/pages/RolePage'
 import { AdminUserPage } from '@/pages/AdminUserPage'
+import { AppUserPage } from '@/pages/AppUserPage'
 
 // Root route
 const rootRoute = createRootRoute({
@@ -76,10 +77,17 @@ const adminUserRoute = createRoute({
   component: AdminUserPage,
 })
 
+// App user management route
+const appUserRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: '/app-users',
+  component: AppUserPage,
+})
+
 // Route tree
 const routeTree = rootRoute.addChildren([
   authRoute.addChildren([loginRoute]),
-  adminRoute.addChildren([homeRoute, menuRoute, roleRoute, adminUserRoute]),
+  adminRoute.addChildren([homeRoute, menuRoute, roleRoute, adminUserRoute, appUserRoute]),
 ])
 
 // Create router

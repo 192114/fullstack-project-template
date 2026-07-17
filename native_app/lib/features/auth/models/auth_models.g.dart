@@ -101,3 +101,46 @@ Map<String, dynamic> _$ResetPasswordRequestToJson(
   'newPassword': instance.newPassword,
   'code': instance.code,
 };
+
+_RegisterResponse _$RegisterResponseFromJson(Map<String, dynamic> json) =>
+    _RegisterResponse(
+      user: UserModel.fromJson(json['user'] as Map<String, dynamic>),
+    );
+
+Map<String, dynamic> _$RegisterResponseToJson(_RegisterResponse instance) =>
+    <String, dynamic>{'user': instance.user};
+
+_AuditStatusResponse _$AuditStatusResponseFromJson(Map<String, dynamic> json) =>
+    _AuditStatusResponse(
+      auditStatus: (json['auditStatus'] as num).toInt(),
+      auditRemark: json['auditRemark'] as String?,
+      nickname: json['nickname'] as String?,
+      phone: json['phone'] as String?,
+      createTime: json['createTime'] as String?,
+    );
+
+Map<String, dynamic> _$AuditStatusResponseToJson(
+  _AuditStatusResponse instance,
+) => <String, dynamic>{
+  'auditStatus': instance.auditStatus,
+  'auditRemark': instance.auditRemark,
+  'nickname': instance.nickname,
+  'phone': instance.phone,
+  'createTime': instance.createTime,
+};
+
+_ResubmitRequest _$ResubmitRequestFromJson(Map<String, dynamic> json) =>
+    _ResubmitRequest(
+      phone: json['phone'] as String,
+      password: json['password'] as String,
+      code: json['code'] as String,
+      nickname: json['nickname'] as String?,
+    );
+
+Map<String, dynamic> _$ResubmitRequestToJson(_ResubmitRequest instance) =>
+    <String, dynamic>{
+      'phone': instance.phone,
+      'password': instance.password,
+      'code': instance.code,
+      'nickname': instance.nickname,
+    };

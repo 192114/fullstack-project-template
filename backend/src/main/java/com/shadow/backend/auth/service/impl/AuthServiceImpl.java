@@ -6,14 +6,18 @@ import com.shadow.backend.auth.dto.LoginResponse;
 import com.shadow.backend.auth.dto.PasswordLoginRequest;
 import com.shadow.backend.auth.dto.RefreshTokenRequest;
 import com.shadow.backend.auth.dto.RegisterRequest;
+import com.shadow.backend.auth.dto.RegisterResponse;
+import com.shadow.backend.auth.dto.ResubmitRequest;
 import com.shadow.backend.auth.dto.ResetPasswordRequest;
 import com.shadow.backend.auth.dto.SmsLoginRequest;
 import com.shadow.backend.auth.response.AuthResultCode;
 import com.shadow.backend.auth.service.AuthService;
 import com.shadow.backend.auth.service.SmsService;
 import com.shadow.backend.auth.service.TokenService;
+import com.shadow.backend.auth.vo.AuditStatusVO;
 import com.shadow.backend.auth.vo.RefreshTokenResponse;
 import com.shadow.backend.auth.vo.TokenPair;
+import com.shadow.backend.user.constant.AuditStatus;
 import com.shadow.backend.common.exception.BusinessException;
 import com.shadow.backend.common.util.LoginUserUtil;
 import com.shadow.backend.common.util.PasswordUtil;
@@ -45,6 +49,7 @@ public class AuthServiceImpl implements AuthService {
         if (user == null || !passwordUtil.verify(req.getPassword(), user.getPassword())) {
             throw new BusinessException(UserResultCode.LOGIN_FAILED);
         }
+        checkAuditStatus(user);
         checkUserStatus(user);
         return buildLoginResponse(user);
     }
@@ -56,13 +61,14 @@ public class AuthServiceImpl implements AuthService {
         if (user == null) {
             throw new BusinessException(AuthResultCode.PHONE_NOT_REGISTERED);
         }
+        checkAuditStatus(user);
         checkUserStatus(user);
         return buildLoginResponse(user);
     }
 
     @Override
     @Transactional
-    public LoginResponse register(RegisterRequest req) {
+    public RegisterResponse register(RegisterRequest req) {
         smsService.verifyCode(req.getPhone(), SmsScene.REGISTER, req.getCode());
 
         User existing = userService.getByPhone(req.getPhone());
@@ -75,10 +81,52 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordUtil.hash(req.getPassword()));
         user.setNickname(StringUtils.hasText(req.getNickname()) ? req.getNickname() : "用户" + maskPhone(req.getPhone()));
         user.setStatus(1);
+        user.setAuditStatus(0);
         userMapper.insert(user);
 
         log.info("用户注册成功: phone={}", req.getPhone());
-        return buildLoginResponse(user);
+        return new RegisterResponse(userService.getById(user.getId()));
+    }
+
+    @Override
+    public AuditStatusVO getAuditStatus(String phone) {
+        User user = userService.getByPhone(phone);
+        if (user == null) {
+            throw new BusinessException(AuthResultCode.PHONE_NOT_REGISTERED);
+        }
+        return new AuditStatusVO(
+                user.getAuditStatus(),
+                user.getAuditRemark(),
+                user.getNickname(),
+                maskPhone(user.getPhone()),
+                user.getCreateTime()
+        );
+    }
+
+    @Override
+    @Transactional
+    public RegisterResponse resubmit(ResubmitRequest req) {
+        smsService.verifyCode(req.getPhone(), SmsScene.REGISTER, req.getCode());
+
+        User user = userService.getByPhone(req.getPhone());
+        if (user == null) {
+            throw new BusinessException(AuthResultCode.PHONE_NOT_REGISTERED);
+        }
+        if (user.getAuditStatus() == null || user.getAuditStatus() != AuditStatus.REJECTED.getValue()) {
+            throw new BusinessException(AuthResultCode.RESUBMIT_NOT_REJECTED);
+        }
+
+        user.setPassword(passwordUtil.hash(req.getPassword()));
+        if (StringUtils.hasText(req.getNickname())) {
+            user.setNickname(req.getNickname());
+        }
+        user.setAuditStatus(0);
+        user.setAuditRemark(null);
+        user.setAuditTime(null);
+        userMapper.updateById(user);
+
+        log.info("用户重新提交审核: phone={}", req.getPhone());
+        return new RegisterResponse(userService.getById(user.getId()));
     }
 
     @Override
@@ -109,6 +157,21 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordUtil.hash(req.getNewPassword()));
         userMapper.updateById(user);
         log.info("密码重置成功: phone={}", req.getPhone());
+    }
+
+    private void checkAuditStatus(User user) {
+        if (user.getAuditStatus() == null) {
+            return;
+        }
+        if (user.getAuditStatus() == 0) {
+            throw new BusinessException(AuthResultCode.USER_AUDIT_PENDING);
+        }
+        if (user.getAuditStatus() == 2) {
+            String msg = user.getAuditRemark() != null
+                    ? AuthResultCode.USER_AUDIT_REJECTED.getMsg() + "：" + user.getAuditRemark()
+                    : AuthResultCode.USER_AUDIT_REJECTED.getMsg();
+            throw new BusinessException(AuthResultCode.USER_AUDIT_REJECTED, msg);
+        }
     }
 
     private void checkUserStatus(User user) {

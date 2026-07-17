@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Plus, Pencil, Trash2, Loader2, UserCog,
+  Plus, Trash2, Loader2, UserCog,
   Search, RotateCcw, AlertTriangle, MoreHorizontal,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'

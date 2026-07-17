@@ -12,8 +12,8 @@ abstract class AuthRepository {
   /// 验证码登录
   Future<LoginResponse> loginBySms(String phone, String code);
 
-  /// 注册
-  Future<LoginResponse> register(
+  /// 注册（返回 RegisterResponse，不含 Token）
+  Future<RegisterResponse> register(
     String phone,
     String password,
     String code, {
@@ -35,4 +35,15 @@ abstract class AuthRepository {
     String newPassword,
     String code,
   );
+
+  /// 查询审核状态
+  Future<AuditStatusResponse> getAuditStatus(String phone);
+
+  /// 驳回后重新提交审核
+  Future<RegisterResponse> resubmit(
+    String phone,
+    String password,
+    String code, {
+    String? nickname,
+  });
 }

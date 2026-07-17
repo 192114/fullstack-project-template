@@ -33,7 +33,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<LoginResponse> register(
+  Future<RegisterResponse> register(
     String phone,
     String password,
     String code, {
@@ -45,7 +45,7 @@ class AuthRepositoryImpl implements AuthRepository {
       code,
       nickname: nickname,
     );
-    return await _handleLoginResponse(data);
+    return RegisterResponse.fromJson(data);
   }
 
   @override
@@ -81,6 +81,28 @@ class AuthRepositoryImpl implements AuthRepository {
     String code,
   ) async {
     await _remoteDataSource.resetPassword(phone, newPassword, code);
+  }
+
+  @override
+  Future<AuditStatusResponse> getAuditStatus(String phone) async {
+    final data = await _remoteDataSource.getAuditStatus(phone);
+    return AuditStatusResponse.fromJson(data);
+  }
+
+  @override
+  Future<RegisterResponse> resubmit(
+    String phone,
+    String password,
+    String code, {
+    String? nickname,
+  }) async {
+    final data = await _remoteDataSource.resubmit(
+      phone,
+      password,
+      code,
+      nickname: nickname,
+    );
+    return RegisterResponse.fromJson(data);
   }
 
   /// 处理登录响应，保存双 Token

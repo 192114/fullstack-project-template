@@ -14,6 +14,9 @@ public class UserVO {
     private String avatar;
     private String email;
     private Integer status;
+    private Integer auditStatus;
+    private String auditRemark;
+    private LocalDateTime auditTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

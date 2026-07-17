@@ -3,10 +3,9 @@ spring:
     name: backend
   profiles:
     active: dev
-  spring:
-    jackson:
-      date-format: yyyy-MM-dd HH:mm:ss
-      time-zone: Asia/Shanghai
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
 
 server:
   port: 8080

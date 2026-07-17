@@ -15,4 +15,6 @@ public class UserPageQuery {
     private long size = 10;
 
     private String username;
+
+    private Integer auditStatus;
 }

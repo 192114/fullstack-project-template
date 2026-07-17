@@ -28,4 +28,6 @@ public interface UserService {
     UserVO updateProfile(Long userId, UpdateProfileRequest request);
 
     void changePassword(Long userId, ChangePasswordRequest request);
+
+    UserVO audit(Long id, Integer auditStatus, String auditRemark);
 }

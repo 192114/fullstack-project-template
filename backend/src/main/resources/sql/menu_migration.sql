@@ -72,10 +72,14 @@ VALUES (16, 14, '修改菜单', 3, NULL, NULL, 2, 'menu:update', 1, 1);
 INSERT INTO sys_menu (id, parent_id, name, type, path, icon, sort_order, permission, visible, status)
 VALUES (17, 14, '删除菜单', 3, NULL, NULL, 3, 'menu:delete', 1, 1);
 
--- ===== APP管理 > 用户管理 (菜单, 原 App用户管理) =====
+-- ===== APP管理 > App 用户管理 (菜单) =====
 
 INSERT INTO sys_menu (id, parent_id, name, type, path, icon, sort_order, permission, visible, status)
-VALUES (18, 3, '用户管理', 2, '/users', 'Users', 1, 'user:list', 1, 1);
+VALUES (18, 3, 'App 用户管理', 2, '/app-users', 'Users', 1, 'user:list', 1, 1);
+
+-- App 用户管理按钮
+INSERT INTO sys_menu (id, parent_id, name, type, path, icon, sort_order, permission, visible, status)
+VALUES (19, 18, '审核用户', 3, NULL, NULL, 1, 'user:audit', 1, 1);
 
 -- 4. 关联超级管理员角色(code=support)与全部菜单
 INSERT INTO sys_role_menu (role_id, menu_id)

@@ -11,12 +11,16 @@ CREATE TABLE IF NOT EXISTS app_user (
     avatar      VARCHAR(255) DEFAULT NULL COMMENT '头像URL',
     email       VARCHAR(128) DEFAULT NULL COMMENT '邮箱',
     status      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+    audit_status TINYINT     NOT NULL DEFAULT 1 COMMENT '审核状态：0-待审核，1-已通过，2-已拒绝',
+    audit_remark VARCHAR(255) DEFAULT NULL COMMENT '审核备注/驳回原因',
+    audit_time   DATETIME    DEFAULT NULL COMMENT '审核时间',
     deleted     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除，1-已删除',
     create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id),
     UNIQUE KEY uk_phone (phone),
-    UNIQUE KEY uk_username (username)
+    UNIQUE KEY uk_username (username),
+    INDEX idx_audit_status (audit_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
 CREATE TABLE IF NOT EXISTS app_sms_log (

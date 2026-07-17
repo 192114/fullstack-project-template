@@ -19,8 +19,8 @@ class RegisterViewModel extends Notifier<RegisterState> {
   RegisterState build() => const RegisterState();
 
   /// 注册
-  /// 返回 true 表示注册成功（自动登录）
-  Future<bool> register(
+  /// 返回手机号表示注册成功（需跳转审核页），返回 null 表示失败
+  Future<String?> register(
     String phone,
     String password,
     String code, {
@@ -32,13 +32,13 @@ class RegisterViewModel extends Notifier<RegisterState> {
           .read(authRepositoryProvider)
           .register(phone, password, code, nickname: nickname);
       state = state.copyWith(isLoading: false);
-      return true;
+      return phone;
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.message);
-      return false;
+      return null;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: '未知错误，请稍后重试');
-      return false;
+      return null;
     }
   }
 }

@@ -21,7 +21,9 @@ public class SaTokenConfigure implements WebMvcConfigurer {
                         "/api/app/auth/register",
                         "/api/app/auth/refresh",
                         "/api/app/auth/send-code",
-                        "/api/app/auth/reset-password"
+                        "/api/app/auth/reset-password",
+                        "/api/app/auth/audit-status",
+                        "/api/app/auth/resubmit"
                 );
 
         // ========== Admin 用户拦截器（StpAdminUtil, accountType = "admin"） ==========

@@ -14,7 +14,10 @@ public enum AuthResultCode implements IResultCode {
     SMS_CODE_INVALID(10013, "验证码错误"),
     SMS_CODE_SEND_TOO_FREQUENT(10014, "验证码发送过于频繁，请稍后再试"),
     SMS_SCENE_INVALID(10015, "无效的验证码场景"),
-    REFRESH_TOKEN_INVALID(10016, "刷新令牌无效或已过期");
+    REFRESH_TOKEN_INVALID(10016, "刷新令牌无效或已过期"),
+    USER_AUDIT_PENDING(10017, "账号审核中，请耐心等待管理员审核"),
+    USER_AUDIT_REJECTED(10018, "注册审核未通过"),
+    RESUBMIT_NOT_REJECTED(10020, "当前状态不允许重新提交，仅审核驳回后可操作");
 
     private final int code;
     private final String msg;
