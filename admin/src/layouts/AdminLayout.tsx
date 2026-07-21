@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { Outlet, useNavigate, useLocation } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard, Users, Shield, Activity, FileText,
   ChevronLeft, ChevronRight, ChevronDown,
@@ -365,11 +366,13 @@ export function AdminLayout() {
   const [collapsed, setCollapsed] = useState(false)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const location = useLocation()
   const { data: menuTree, isLoading } = useMenuTree()
 
   const handleLogout = () => {
     localStorage.removeItem('token')
+    queryClient.clear()
     navigate({ to: '/login' })
   }
 

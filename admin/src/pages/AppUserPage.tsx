@@ -20,6 +20,7 @@ import {
 import { Pagination } from '@/components/ui/pagination'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
+import { HasPermission } from '@/components/HasPermission'
 import { usePagedQuery } from '@/hooks/usePagedQuery'
 import { appUserApi } from '@/services/api/appUser'
 import type { AppUserInfo } from '@/types/api'
@@ -201,18 +202,22 @@ export function AppUserPage() {
                       <div className="flex items-center justify-end gap-1">
                         {user.auditStatus === 0 && (
                           <>
-                            <button
-                              onClick={() => handleApprove(user)}
-                              className="rounded-md px-2.5 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-50"
-                            >
-                              通过
-                            </button>
-                            <button
-                              onClick={() => openReject(user)}
-                              className="rounded-md px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-                            >
-                              驳回
-                            </button>
+                            <HasPermission perm="user:audit">
+                              <button
+                                onClick={() => handleApprove(user)}
+                                className="rounded-md px-2.5 py-1 text-xs font-medium text-green-600 transition-colors hover:bg-green-50"
+                              >
+                                通过
+                              </button>
+                            </HasPermission>
+                            <HasPermission perm="user:audit">
+                              <button
+                                onClick={() => openReject(user)}
+                                className="rounded-md px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+                              >
+                                驳回
+                              </button>
+                            </HasPermission>
                           </>
                         )}
                         <button

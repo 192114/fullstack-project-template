@@ -1,6 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '@/types/api'
 import { router } from '@/app/router'
+import { queryClient } from '@/app/queryClient'
 
 // Create axios instance
 const request = axios.create({
@@ -33,8 +34,9 @@ request.interceptors.response.use(
     if (data.code !== 200) {
       // Handle specific error codes
       if (data.code === 401) {
-        // Token expired or invalid - clear token and redirect to login
+        // Token expired or invalid - clear token, cache and redirect to login
         localStorage.removeItem('token')
+        queryClient.clear()
         router.navigate({ to: '/login' })
         return Promise.reject(new Error(data.msg || '未登录或登录已过期'))
       }
@@ -45,6 +47,7 @@ request.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
+      queryClient.clear()
       router.navigate({ to: '/login' })
     }
     return Promise.reject(error)

@@ -25,4 +25,10 @@ export const authApi = {
     requestApi<AdminUserInfo>(
       request.get<ApiResponse<AdminUserInfo>>('/api/admin/auth/me')
     ),
+
+  /** Get current admin's permission list (for button-level access control) */
+  getPermissions: () =>
+    requestApi<string[]>(
+      request.get<ApiResponse<string[]>>('/api/admin/auth/permissions')
+    ),
 }

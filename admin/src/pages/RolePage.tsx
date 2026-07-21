@@ -20,6 +20,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Pagination } from '@/components/ui/pagination'
 import { cn } from '@/lib/utils'
+import { HasPermission } from '@/components/HasPermission'
 import { roleApi } from '@/services/api/role'
 import { useAllMenus } from '@/hooks/useMenuTree'
 import type { RoleVO, CreateRoleRequest, UpdateRoleRequest, MenuTreeVO } from '@/types/api'
@@ -223,9 +224,11 @@ export function RolePage() {
               <RotateCcw className="size-4" />重置
             </Button>
             <div className="flex-1" />
-            <Button onClick={openCreate}>
-              <Plus className="size-4" />新增角色
-            </Button>
+            <HasPermission perm="role:create">
+              <Button onClick={openCreate}>
+                <Plus className="size-4" />新增角色
+              </Button>
+            </HasPermission>
           </div>
         </CardContent>
       </Card>
@@ -268,24 +271,30 @@ export function RolePage() {
                     <TableCell className="text-sm text-gray-500">{role.createTime}</TableCell>
                     <TableCell className="pr-4">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => openAssign(role)}
-                          className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
-                        >
-                          权限
-                        </button>
-                        <button
-                          onClick={() => openEdit(role)}
-                          className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
-                        >
-                          编辑
-                        </button>
-                        <button
-                          onClick={() => openDelete(role)}
-                          className="rounded-md px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-                        >
-                          删除
-                        </button>
+                        <HasPermission perm="role:assign">
+                          <button
+                            onClick={() => openAssign(role)}
+                            className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+                          >
+                            权限
+                          </button>
+                        </HasPermission>
+                        <HasPermission perm="role:update">
+                          <button
+                            onClick={() => openEdit(role)}
+                            className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+                          >
+                            编辑
+                          </button>
+                        </HasPermission>
+                        <HasPermission perm="role:delete">
+                          <button
+                            onClick={() => openDelete(role)}
+                            className="rounded-md px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+                          >
+                            删除
+                          </button>
+                        </HasPermission>
                       </div>
                     </TableCell>
                   </TableRow>

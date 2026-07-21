@@ -24,6 +24,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { usePermissions } from '@/hooks/usePermissions'
+import { hasPermission } from '@/lib/permission'
 import { usePagedQuery } from '@/hooks/usePagedQuery'
 import { adminUserApi } from '@/services/api/adminUser'
 import { roleApi } from '@/services/api/role'
@@ -54,6 +56,7 @@ function getRoleBadgeClass(code: string): string {
 
 export function AdminUserPage() {
   const queryClient = useQueryClient()
+  const { data: permissions = [] } = usePermissions()
   const [searchUsername, setSearchUsername] = useState('')
   const [filterRole, setFilterRole] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -255,9 +258,11 @@ export function AdminUserPage() {
               <RotateCcw className="size-4" />重置
             </Button>
             <div className="flex-1" />
-            <Button onClick={openCreate}>
-              <Plus className="size-4" />新增管理员
-            </Button>
+            {hasPermission(permissions, 'admin-user:create') && (
+              <Button onClick={openCreate}>
+                <Plus className="size-4" />新增管理员
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -327,41 +332,51 @@ export function AdminUserPage() {
                     <TableCell className="text-gray-500 text-sm">{user.createTime}</TableCell>
                     <TableCell className="pr-4">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => openEdit(user)}
-                          className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
-                        >
-                          编辑
-                        </button>
-                        <button
-                          onClick={() => handleToggleStatus(user)}
-                          className={cn(
-                            'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-                            user.status === 1
-                              ? 'text-amber-600 hover:bg-amber-50'
-                              : 'text-green-600 hover:bg-green-50',
-                          )}
-                        >
-                          {user.status === 1 ? '禁用' : '启用'}
-                        </button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button className="rounded-md px-2 py-1 text-gray-400 transition-colors hover:bg-gray-100">
-                              <MoreHorizontal className="size-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-32">
-                            <DropdownMenuItem onClick={() => openAssign(user)}>
-                              <UserCog className="size-4" />分配角色
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => openDelete(user)}
-                              className="text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="size-4" />删除
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {hasPermission(permissions, 'admin-user:update') && (
+                          <button
+                            onClick={() => openEdit(user)}
+                            className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+                          >
+                            编辑
+                          </button>
+                        )}
+                        {hasPermission(permissions, 'admin-user:update') && (
+                          <button
+                            onClick={() => handleToggleStatus(user)}
+                            className={cn(
+                              'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                              user.status === 1
+                                ? 'text-amber-600 hover:bg-amber-50'
+                                : 'text-green-600 hover:bg-green-50',
+                            )}
+                          >
+                            {user.status === 1 ? '禁用' : '启用'}
+                          </button>
+                        )}
+                        {(hasPermission(permissions, 'admin-user:assign') || hasPermission(permissions, 'admin-user:delete')) && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="rounded-md px-2 py-1 text-gray-400 transition-colors hover:bg-gray-100">
+                                <MoreHorizontal className="size-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-32">
+                              {hasPermission(permissions, 'admin-user:assign') && (
+                                <DropdownMenuItem onClick={() => openAssign(user)}>
+                                  <UserCog className="size-4" />分配角色
+                                </DropdownMenuItem>
+                              )}
+                              {hasPermission(permissions, 'admin-user:delete') && (
+                                <DropdownMenuItem
+                                  onClick={() => openDelete(user)}
+                                  className="text-red-600 focus:text-red-600"
+                                >
+                                  <Trash2 className="size-4" />删除
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

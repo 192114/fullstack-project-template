@@ -18,6 +18,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { HasPermission } from '@/components/HasPermission'
 import { menuApi } from '@/services/api/menu'
 import { useAllMenus } from '@/hooks/useMenuTree'
 import type { MenuTreeVO, CreateMenuRequest } from '@/types/api'
@@ -174,9 +175,11 @@ export function MenuPage() {
               <RotateCcw className="size-4" />重置
             </Button>
             <div className="flex-1" />
-            <Button onClick={openCreate}>
-              <Plus className="size-4" />新增菜单
-            </Button>
+            <HasPermission perm="menu:create">
+              <Button onClick={openCreate}>
+                <Plus className="size-4" />新增菜单
+              </Button>
+            </HasPermission>
           </div>
         </CardContent>
       </Card>
@@ -244,18 +247,22 @@ export function MenuPage() {
                       </TableCell>
                       <TableCell className="pr-4">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => openEdit(menu)}
-                            className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
-                          >
-                            编辑
-                          </button>
-                          <button
-                            onClick={() => openDelete(menu)}
-                            className="rounded-md px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-                          >
-                            删除
-                          </button>
+                          <HasPermission perm="menu:update">
+                            <button
+                              onClick={() => openEdit(menu)}
+                              className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+                            >
+                              编辑
+                            </button>
+                          </HasPermission>
+                          <HasPermission perm="menu:delete">
+                            <button
+                              onClick={() => openDelete(menu)}
+                              className="rounded-md px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+                            >
+                              删除
+                            </button>
+                          </HasPermission>
                         </div>
                       </TableCell>
                     </TableRow>

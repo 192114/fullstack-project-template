@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod/v4'
 import { Eye, EyeOff, Loader2, Mail, Lock } from 'lucide-react'
@@ -31,6 +32,7 @@ type LoginForm = z.infer<typeof loginSchema>
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -52,6 +54,8 @@ export function LoginPage() {
     try {
       const response = await authApi.login(data)
       localStorage.setItem('token', response.token)
+      // Clear cached data from a previous session before navigating
+      queryClient.clear()
       navigate({ to: '/' })
     } catch (err) {
       setError(err instanceof Error ? err.message : '登录失败，请稍后重试')

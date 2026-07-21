@@ -23,12 +23,18 @@ class ApiInterceptor extends Interceptor {
     Logger? logger,
   })  : _logger = logger ?? Logger();
 
+  /// 内部请求标记：跳过 Authorization 自动注入（用于刷新 Token 等请求，
+  /// 避免被过期 Access Token 覆盖）
+  static const _kSkipAuth = 'skipAuth';
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    // 注入 Authorization Header
-    final authHeader = _tokenManager.authorizationHeader;
-    if (authHeader != null) {
-      options.headers['Authorization'] = authHeader;
+    // 内部请求（如刷新 Token）跳过 Authorization 自动注入
+    if (options.extra[_kSkipAuth] != true) {
+      final authHeader = _tokenManager.authorizationHeader;
+      if (authHeader != null) {
+        options.headers['Authorization'] = authHeader;
+      }
     }
 
     _logger.d('Request: ${options.method} ${options.uri}');
@@ -58,10 +64,10 @@ class ApiInterceptor extends Interceptor {
         _isRefreshing = true;
 
         try {
-          // 调用刷新 Token 接口
-          final success = await _refreshToken();
+          // 调用刷新 Token 接口；返回 null 表示成功，非空为失败原因
+          final failureMessage = await _refreshToken();
 
-          if (success) {
+          if (failureMessage == null) {
             // 刷新成功，重试原请求
             await _retryRequest(err, handler);
 
@@ -75,10 +81,10 @@ class ApiInterceptor extends Interceptor {
             handler.reject(
               DioException(
                 requestOptions: err.requestOptions,
-                error: const ApiException(
+                error: ApiException(
                   code: 401,
                   type: ApiExceptionType.unauthorized,
-                  message: '登录已过期，请重新登录',
+                  message: failureMessage,
                 ),
               ),
             );
@@ -113,37 +119,46 @@ class ApiInterceptor extends Interceptor {
   }
 
   /// 刷新 Token
-  Future<bool> _refreshToken() async {
+  ///
+  /// 通过 refreshToken 调用 `/api/app/auth/refresh` 换取新的双 Token。
+  /// 返回 `null` 表示刷新成功；返回非空字符串表示失败原因
+  /// （优先透传后端 `msg`，如「刷新令牌无效或已过期」）。
+  Future<String?> _refreshToken() async {
     try {
       final refreshToken = _tokenManager.refreshToken;
-      if (refreshToken == null) return false;
+      if (refreshToken == null) return '登录已过期，请重新登录';
 
-      // TODO: 替换为实际的刷新 Token 接口
       final response = await _dio.post(
         '/app/auth/refresh',
         data: {'refreshToken': refreshToken},
-        options: Options(
-          headers: {'Authorization': ''}, // 清除 Authorization Header
-        ),
+        // 标记为内部请求，跳过 onRequest 中对 Authorization 的自动注入，
+        // 避免过期的 Access Token 覆盖本次刷新请求
+        options: Options(extra: const {_kSkipAuth: true}),
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data['data'] as Map<String, dynamic>?;
-        final newAccessToken = data?['accessToken'] as String?;
-        final newRefreshToken = data?['refreshToken'] as String?;
-
-        if (newAccessToken != null) {
-          await _tokenManager.saveTokens(
-            accessToken: newAccessToken,
-            refreshToken: newRefreshToken ?? refreshToken,
-          );
-          return true;
+        final body = response.data as Map<String, dynamic>;
+        final code = body['code'] as int?;
+        if (code == 200) {
+          final data = body['data'] as Map<String, dynamic>?;
+          final newAccessToken = data?['accessToken'] as String?;
+          final newRefreshToken = data?['refreshToken'] as String?;
+          if (newAccessToken != null) {
+            await _tokenManager.saveTokens(
+              accessToken: newAccessToken,
+              refreshToken: newRefreshToken ?? refreshToken,
+            );
+            return null;
+          }
         }
+        // 业务失败：透传后端具体原因
+        final msg = body['msg'] as String?;
+        return (msg != null && msg.isNotEmpty) ? msg : '登录已过期，请重新登录';
       }
-      return false;
+      return '登录已过期，请重新登录';
     } catch (e) {
       _logger.e('Refresh token failed: $e');
-      return false;
+      return 'Token 刷新失败';
     }
   }
 

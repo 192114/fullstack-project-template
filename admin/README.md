@@ -42,7 +42,28 @@ src/
 
 ## 鉴权
 
-`adminRoute` 的 `beforeLoad` 目前只校验 `localStorage` 里是否存在 `token`，不做按钮级/路由级的权限校验。真实项目如果需要按钮级权限，再基于 `authApi` 补充权限接口和对应 hook，不需要提前搭建。
+### 登录校验
+
+`adminRoute` 的 `beforeLoad` 检查 `localStorage` 中是否存在 `token`，未登录则重定向到 `/login`。
+
+### 路由级权限
+
+`adminRoute.beforeLoad` 在登录校验后，通过 `GET /api/admin/auth/permissions` 预取当前用户权限列表并存入路由 context。每个子路由的 `beforeLoad` 从 context 读取权限，校验对应的权限标识（如 `menu:list`），无权限则重定向到 `/403`。
+
+权限标识与路由的映射在后端 `RbacDataInitializer` 种子数据中定义（`sys_menu` 表 type=2 的 `permission` 字段）。
+
+### 按钮级权限
+
+- `usePermissions` hook：基于 TanStack Query 封装，queryKey `['permissions']`，与路由 `beforeLoad` 预取共享缓存。
+- `hasPermission(permissions, perm)` 工具函数：支持 `*` 通配符（超级管理员）。
+- `<HasPermission perm="xxx">` 组件：无权限时不渲染 children。
+
+在 `AdminUserPage`、`RolePage`、`MenuPage`、`AppUserPage` 的增删改按钮上已应用按钮级权限控制。
+
+### 异常页面
+
+- **404**：`rootRoute` 配置 `notFoundComponent`，访问不存在的路由时显示 `NotFoundPage`。
+- **403**：`/403` 路由渲染 `ForbiddenPage`，路由级权限校验失败时重定向到此页面。
 
 ## 常用命令
 
