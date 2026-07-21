@@ -10,6 +10,7 @@ import com.shadow.backend.admin.auth.service.AdminAuthService;
 import com.shadow.backend.admin.auth.vo.AdminUserVO;
 import com.shadow.backend.common.exception.BusinessException;
 import com.shadow.backend.common.util.LoginAdminUtil;
+import com.shadow.backend.common.util.LoginAttemptGuard;
 import com.shadow.backend.common.util.PasswordUtil;
 import com.shadow.backend.common.util.StpAdminUtil;
 import lombok.RequiredArgsConstructor;
@@ -21,18 +22,27 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AdminAuthServiceImpl implements AdminAuthService {
 
+    private static final String LOGIN_ATTEMPT_SCENE = "admin-password";
+
     private final AdminUserMapper adminUserMapper;
     private final PasswordUtil passwordUtil;
+    private final LoginAttemptGuard loginAttemptGuard;
 
     @Override
     public AdminLoginResponse login(AdminLoginRequest req) {
+        if (loginAttemptGuard.isLocked(LOGIN_ATTEMPT_SCENE, req.getUsername())) {
+            throw new BusinessException(AdminResultCode.LOGIN_LOCKED);
+        }
+
         AdminUser admin = adminUserMapper.selectOne(
                 new LambdaQueryWrapper<AdminUser>().eq(AdminUser::getUsername, req.getUsername())
         );
 
         if (admin == null || !passwordUtil.verify(req.getPassword(), admin.getPassword())) {
+            loginAttemptGuard.onLoginFailed(LOGIN_ATTEMPT_SCENE, req.getUsername());
             throw new BusinessException(AdminResultCode.LOGIN_FAILED);
         }
+        loginAttemptGuard.onLoginSucceeded(LOGIN_ATTEMPT_SCENE, req.getUsername());
 
         checkAdminStatus(admin);
 

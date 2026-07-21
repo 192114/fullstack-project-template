@@ -17,7 +17,8 @@ public enum AuthResultCode implements IResultCode {
     REFRESH_TOKEN_INVALID(10016, "刷新令牌无效或已过期"),
     USER_AUDIT_PENDING(10017, "账号审核中，请耐心等待管理员审核"),
     USER_AUDIT_REJECTED(10018, "注册审核未通过"),
-    RESUBMIT_NOT_REJECTED(10020, "当前状态不允许重新提交，仅审核驳回后可操作");
+    RESUBMIT_NOT_REJECTED(10020, "当前状态不允许重新提交，仅审核驳回后可操作"),
+    LOGIN_LOCKED(10021, "登录失败次数过多，请15分钟后再试");
 
     private final int code;
     private final String msg;

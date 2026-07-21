@@ -15,7 +15,7 @@
 
 ## 项目结构
 
-采用 **Feature-based（按业务模块划分）** 的目录结构：
+采用 **Feature-based（按业务模块划分）** 的目录结构。项目是 **App 端 / 管理端双账户体系**：App 端接口挂在 `/api/app/**`（`StpAppUtil` 校验），管理端接口挂在 `/api/admin/**`（`StpAdminUtil` 校验），两套会话完全隔离。
 
 ```
 src/main/java/com/shadow/backend/
@@ -26,27 +26,34 @@ src/main/java/com/shadow/backend/
 │   ├── exception/           # 业务异常 + 全局异常处理
 │   ├── filter/              # 过滤器（TraceId 链路追踪）
 │   ├── response/            # 统一返回结构 Result<T>
-│   ├── util/                # 工具类（Argon2 密码加密）
-│   ├── security/            # 安全相关扩展（预留）
-│   └── annotation/          # 自定义注解（预留）
+│   └── util/                # 工具类（Argon2 密码加密、登录失败次数限制等）
 │
-├── user/                    # 用户模块（CRUD 示例）
+├── user/                    # App 用户模块（注册用户、审核状态）
 │   ├── controller/          # REST 接口
 │   ├── service/             # 业务逻辑
 │   ├── mapper/              # MyBatis Mapper
 │   ├── entity/              # 数据库实体
 │   ├── dto/                 # 请求参数
 │   ├── vo/                  # 响应视图
-│   └── repository/          # 仓储层（预留）
+│   └── constant/            # 枚举/常量（如 AuditStatus）
 │
-├── auth/                    # 登录认证模块
-│   ├── controller/          # 登录/登出/注册
+├── auth/                    # App 端登录认证模块（/api/app/auth/**）
+│   ├── controller/          # 登录/注册/审核状态/重新提交
 │   ├── service/             # 认证业务
 │   ├── dto/                 # 登录请求/响应
-│   └── security/            # 认证扩展（预留）
+│   └── vo/                  # 响应视图
+│
+├── admin/                   # 管理端模块（/api/admin/**）
+│   ├── auth/                # 管理员登录
+│   ├── user/                # App 用户管理 + 注册审核
+│   ├── adminuser/           # 管理员账号管理
+│   ├── role/                # 角色管理
+│   └── menu/                # 菜单管理
 │
 └── BackendApplication.java  # 启动类
 ```
+
+> 新增模块前先想清楚要放什么再建目录，不需要预先建空的 `security/`、`repository/`、`annotation/` 占位包。
 
 ## 快速启动
 
@@ -61,6 +68,8 @@ src/main/java/com/shadow/backend/
 ```bash
 mysql -u root -p < src/main/resources/sql/schema.sql
 ```
+
+后续表结构变更以 `sql/` 目录下按用途命名的增量 SQL 文件追加维护（如 `menu_migration.sql`），手动执行并在 PR 里说明，不引入 Flyway/Liquibase 等迁移框架。
 
 ### 3. 修改配置
 
@@ -110,7 +119,7 @@ HTTP 状态码与 `code` 字段保持一致（如 404 请求返回 HTTP 404 + `c
 ## 日志格式
 
 ```
-2026-06-10 15:30:00.123 [http-nio-8080-exec-1] [a1b2c3d4e5f6] INFO  c.s.b.aspect.RequestLogAspect - 请求完成 | method=POST | uri=/api/auth/login | ip=127.0.0.1 | cost=42ms
+2026-06-10 15:30:00.123 [http-nio-8080-exec-1] [a1b2c3d4e5f6] INFO  c.s.b.aspect.RequestLogAspect - 请求完成 | method=POST | uri=/api/app/auth/login/password | ip=127.0.0.1 | cost=42ms
 ```
 
 - 链路追踪 ID 通过 `X-Trace-Id` 请求头传递，未传递时自动生成
@@ -118,38 +127,56 @@ HTTP 状态码与 `code` 字段保持一致（如 404 请求返回 HTTP 404 + `c
 
 ## API 示例
 
-### 认证（无需登录）
+### App 端认证 `/api/app/auth`（无需登录）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/auth/register` | 用户注册 |
-| POST | `/api/auth/login` | 用户登录 |
-| POST | `/api/auth/logout` | 用户登出 |
+| POST | `/api/app/auth/send-code` | 发送短信验证码 |
+| POST | `/api/app/auth/register` | 手机号 + 验证码注册（默认进入待审核状态） |
+| POST | `/api/app/auth/login/password` | 手机号密码登录 |
+| POST | `/api/app/auth/login/sms` | 手机号验证码登录 |
+| GET | `/api/app/auth/audit-status?phone=` | 查询注册审核状态 |
+| POST | `/api/app/auth/resubmit` | 审核被拒后重新提交 |
+| POST | `/api/app/auth/reset-password` | 重置密码 |
+| POST | `/api/app/auth/refresh` | 刷新 Token |
 
-### 用户管理（需登录）
-
-请求头携带 Token：`Authorization: <token>`
+### App 端认证（需登录，Header 携带 `Authorization: <token>`）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/users?page=1&size=10` | 分页查询 |
-| GET | `/api/users/{id}` | 查询详情 |
-| POST | `/api/users` | 创建用户 |
-| PUT | `/api/users/{id}` | 更新用户 |
-| DELETE | `/api/users/{id}` | 删除用户 |
+| GET | `/api/app/auth/me` | 获取当前用户信息 |
+| POST | `/api/app/auth/logout` | 登出 |
+
+### 管理端（`/api/admin/**`，需管理员登录）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/admin/auth/login` | 管理员登录（用户名+密码） |
+| GET/POST/PUT/DELETE | `/api/admin/users/**` | App 用户管理（含注册审核 `POST /api/admin/users/{id}/audit`） |
+| GET/POST/PUT/DELETE | `/api/admin/admin-users/**` | 管理员账号管理 |
+| GET/POST/PUT/DELETE | `/api/admin/roles/**` | 角色管理 |
+| GET/POST/PUT/DELETE | `/api/admin/menus/**` | 菜单管理 |
 
 ### 登录示例
 
 ```bash
-curl -X POST http://localhost:8080/api/auth/login \
+# App 端：手机号 + 密码登录
+curl -X POST http://localhost:8080/api/app/auth/login/password \
+  -H "Content-Type: application/json" \
+  -d '{"phone":"13800138000","password":"123456"}'
+
+# 管理端：用户名 + 密码登录
+curl -X POST http://localhost:8080/api/admin/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"123456"}'
 ```
 
+密码登录连续失败 5 次会锁定 15 分钟（`LoginAttemptGuard`，基于 Redis 计数），App 端与管理端分别计数。
+
 ### 带 Token 请求示例
 
 ```bash
-curl http://localhost:8080/api/users \
+curl http://localhost:8080/api/app/auth/me \
   -H "Authorization: <your-token>"
 ```
 

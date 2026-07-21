@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:native_app/core/network/api_exception.dart';
+import 'package:native_app/core/network/async_action.dart';
 
 import 'auth_provider.dart';
 
@@ -27,18 +27,12 @@ class RegisterViewModel extends Notifier<RegisterState> {
     String? nickname,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
-    try {
-      await ref
+    final result = await runAsyncAction(
+      () => ref
           .read(authRepositoryProvider)
-          .register(phone, password, code, nickname: nickname);
-      state = state.copyWith(isLoading: false);
-      return phone;
-    } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
-      return null;
-    } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: '未知错误，请稍后重试');
-      return null;
-    }
+          .register(phone, password, code, nickname: nickname),
+    );
+    state = state.copyWith(isLoading: false, errorMessage: result.errorMessage);
+    return result.success ? phone : null;
   }
 }

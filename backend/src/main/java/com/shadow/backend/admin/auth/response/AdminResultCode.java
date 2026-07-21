@@ -11,6 +11,7 @@ public enum AdminResultCode implements IResultCode {
     LOGIN_FAILED(20001, "用户名或密码错误"),
     ADMIN_DISABLED(20002, "账号已被禁用"),
     ADMIN_NOT_FOUND(20003, "管理员账号不存在"),
+    LOGIN_LOCKED(20004, "登录失败次数过多，请15分钟后再试"),
 
     // Menu
     MENU_NOT_FOUND(20101, "菜单不存在"),

@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { usePagedQuery } from '@/hooks/usePagedQuery'
 import { adminUserApi } from '@/services/api/adminUser'
 import { roleApi } from '@/services/api/role'
 import type { AdminUserManageVO, CreateAdminUserRequest, UpdateAdminUserRequest, RoleVO } from '@/types/api'
@@ -53,15 +54,16 @@ function getRoleBadgeClass(code: string): string {
 
 export function AdminUserPage() {
   const queryClient = useQueryClient()
-  const [page, setPage] = useState(1)
   const [searchUsername, setSearchUsername] = useState('')
   const [filterRole, setFilterRole] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
 
-  const { data: pageData, isLoading } = useQuery({
-    queryKey: ['admin-users', page, searchUsername],
-    queryFn: () => adminUserApi.page({ current: page, size: 10, username: searchUsername || undefined }),
-  })
+  const {
+    page, setPage, records: pagedUsers, total, totalPages, isLoading,
+  } = usePagedQuery(
+    ['admin-users', searchUsername],
+    page => adminUserApi.page({ current: page, size: 10, username: searchUsername || undefined }),
+  )
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editUser, setEditUser] = useState<AdminUserManageVO | null>(null)
@@ -201,13 +203,11 @@ export function AdminUserPage() {
   }
 
   // Client-side filter for role & status (API doesn't support these yet)
-  const users = (pageData?.records || []).filter(u => {
+  const users = pagedUsers.filter(u => {
     if (filterStatus !== 'all' && String(u.status) !== filterStatus) return false
     if (filterRole !== 'all' && !u.roles.some(r => String(r.id) === filterRole)) return false
     return true
   })
-  const total = pageData?.total || 0
-  const totalPages = pageData?.pages || 0
 
   return (
     <div className="space-y-4">

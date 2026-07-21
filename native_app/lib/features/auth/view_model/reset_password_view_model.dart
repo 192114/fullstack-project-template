@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:native_app/core/network/api_exception.dart';
+import 'package:native_app/core/network/async_action.dart';
 
 import 'auth_provider.dart';
 
@@ -27,21 +27,16 @@ class ResetPasswordViewModel extends Notifier<ResetPasswordState> {
     String code,
   ) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
-    try {
-      await ref
+    final result = await runAsyncAction(
+      () => ref
           .read(authRepositoryProvider)
-          .resetPassword(phone, newPassword, code);
-      state = state.copyWith(
-        isLoading: false,
-        successMessage: '密码重置成功，请重新登录',
-      );
-      return true;
-    } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
-      return false;
-    } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: '未知错误，请稍后重试');
-      return false;
-    }
+          .resetPassword(phone, newPassword, code),
+    );
+    state = state.copyWith(
+      isLoading: false,
+      errorMessage: result.errorMessage,
+      successMessage: result.success ? '密码重置成功，请重新登录' : null,
+    );
+    return result.success;
   }
 }

@@ -19,6 +19,7 @@ import com.shadow.backend.auth.vo.RefreshTokenResponse;
 import com.shadow.backend.auth.vo.TokenPair;
 import com.shadow.backend.user.constant.AuditStatus;
 import com.shadow.backend.common.exception.BusinessException;
+import com.shadow.backend.common.util.LoginAttemptGuard;
 import com.shadow.backend.common.util.LoginUserUtil;
 import com.shadow.backend.common.util.PasswordUtil;
 import com.shadow.backend.user.entity.User;
@@ -37,18 +38,28 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
+    private static final String LOGIN_ATTEMPT_SCENE = "app-password";
+
     private final UserMapper userMapper;
     private final UserService userService;
     private final PasswordUtil passwordUtil;
     private final SmsService smsService;
     private final TokenService tokenService;
+    private final LoginAttemptGuard loginAttemptGuard;
 
     @Override
     public LoginResponse loginByPassword(PasswordLoginRequest req) {
+        if (loginAttemptGuard.isLocked(LOGIN_ATTEMPT_SCENE, req.getPhone())) {
+            throw new BusinessException(AuthResultCode.LOGIN_LOCKED);
+        }
+
         User user = userService.getByPhone(req.getPhone());
         if (user == null || !passwordUtil.verify(req.getPassword(), user.getPassword())) {
+            loginAttemptGuard.onLoginFailed(LOGIN_ATTEMPT_SCENE, req.getPhone());
             throw new BusinessException(UserResultCode.LOGIN_FAILED);
         }
+        loginAttemptGuard.onLoginSucceeded(LOGIN_ATTEMPT_SCENE, req.getPhone());
+
         checkAuditStatus(user);
         checkUserStatus(user);
         return buildLoginResponse(user);
@@ -81,7 +92,7 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordUtil.hash(req.getPassword()));
         user.setNickname(StringUtils.hasText(req.getNickname()) ? req.getNickname() : "用户" + maskPhone(req.getPhone()));
         user.setStatus(1);
-        user.setAuditStatus(0);
+        user.setAuditStatus(AuditStatus.PENDING.getValue());
         userMapper.insert(user);
 
         log.info("用户注册成功: phone={}", req.getPhone());
@@ -120,7 +131,7 @@ public class AuthServiceImpl implements AuthService {
         if (StringUtils.hasText(req.getNickname())) {
             user.setNickname(req.getNickname());
         }
-        user.setAuditStatus(0);
+        user.setAuditStatus(AuditStatus.PENDING.getValue());
         user.setAuditRemark(null);
         user.setAuditTime(null);
         userMapper.updateById(user);
@@ -160,13 +171,14 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private void checkAuditStatus(User user) {
-        if (user.getAuditStatus() == null) {
+        AuditStatus auditStatus = AuditStatus.fromValue(user.getAuditStatus());
+        if (auditStatus == null) {
             return;
         }
-        if (user.getAuditStatus() == 0) {
+        if (auditStatus == AuditStatus.PENDING) {
             throw new BusinessException(AuthResultCode.USER_AUDIT_PENDING);
         }
-        if (user.getAuditStatus() == 2) {
+        if (auditStatus == AuditStatus.REJECTED) {
             String msg = user.getAuditRemark() != null
                     ? AuthResultCode.USER_AUDIT_REJECTED.getMsg() + "：" + user.getAuditRemark()
                     : AuthResultCode.USER_AUDIT_REJECTED.getMsg();

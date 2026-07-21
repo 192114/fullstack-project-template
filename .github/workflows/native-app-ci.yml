@@ -1,0 +1,25 @@
+name: native-app-ci
+
+on:
+  push:
+    branches: [main]
+    paths: ['native_app/**', '.github/workflows/native-app-ci.yml']
+  pull_request:
+    paths: ['native_app/**', '.github/workflows/native-app-ci.yml']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: native_app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: stable
+
+      - run: flutter pub get
+      - run: flutter analyze

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Loader2, Search, RotateCcw, Check, X, Clock, Eye,
 } from 'lucide-react'
@@ -20,6 +20,7 @@ import {
 import { Pagination } from '@/components/ui/pagination'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
+import { usePagedQuery } from '@/hooks/usePagedQuery'
 import { appUserApi } from '@/services/api/appUser'
 import type { AppUserInfo } from '@/types/api'
 
@@ -47,20 +48,21 @@ function getAuditBadge(status: number) {
 
 export function AppUserPage() {
   const queryClient = useQueryClient()
-  const [page, setPage] = useState(1)
   const [searchUsername, setSearchUsername] = useState('')
   const [filterAuditStatus, setFilterAuditStatus] = useState<string>('all')
 
-  const { data: pageData, isLoading } = useQuery({
-    queryKey: ['app-users', page, searchUsername, filterAuditStatus],
-    queryFn: () =>
+  const {
+    page, setPage, records: users, total, totalPages, isLoading,
+  } = usePagedQuery(
+    ['app-users', searchUsername, filterAuditStatus],
+    page =>
       appUserApi.page({
         current: page,
         size: 10,
         username: searchUsername || undefined,
         auditStatus: filterAuditStatus === 'all' ? undefined : Number(filterAuditStatus),
       }),
-  })
+  )
 
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
   const [rejectTarget, setRejectTarget] = useState<AppUserInfo | null>(null)
@@ -116,10 +118,6 @@ export function AppUserPage() {
     setFilterAuditStatus('all')
     setPage(1)
   }
-
-  const users = pageData?.records || []
-  const total = pageData?.total || 0
-  const totalPages = pageData?.pages || 0
 
   return (
     <div className="space-y-4">
