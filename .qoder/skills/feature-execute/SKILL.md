@@ -58,6 +58,7 @@ Key rules include: module structure, API response convention, exception handling
 ```
 backend/.qoder/skills/java-springboot/SKILL.md
 ```
+Only adopt its unit-test guidance (JUnit 5 + Mockito). Ignore its `@SpringBootTest`/Testcontainers integration-test suggestions and its JPA/BCrypt tech-stack suggestions — they conflict with `backend/.qoder/rules/testing-convention.md` and the project's actual stack (MyBatis-Plus + Argon2).
 
 **Frontend rules — read ALL files in (only if `native_app` is a target):**
 ```
@@ -71,6 +72,7 @@ native_app/.qoder/skills/flutter-implement-json-serialization/SKILL.md
 native_app/.qoder/skills/flutter-apply-architecture-best-practices/SKILL.md
 native_app/.qoder/skills/flutter-setup-declarative-routing/SKILL.md
 ```
+Only adopt ViewModel state-transition test guidance where it aligns with `native_app/.qoder/rules/testing-convention.md`. Ignore Widget-test, Repository/DataSource-test, and Freezed-serialization-test suggestions — out of scope for this project.
 
 **IMPORTANT:** When generating backend code, follow `backend/.qoder/rules/` exclusively. When generating frontend code, follow `native_app/.qoder/rules/` exclusively. Do NOT invent conventions that conflict with these rules.
 
@@ -86,13 +88,19 @@ Follow the backend tasks in `task.md` order. For each task:
 4. Mark the task as `[x]` in `task.md`
 
 **Execution order reference** (actual tasks come from task.md):
-- Entity → Mapper → DTO/VO → ResultCode → Service (interface + impl) → Controller → Schema update
+- Entity → Mapper → DTO/VO → ResultCode → Service (interface + impl) → Controller → Schema update → Service unit tests
 
 **Key reminders** (details in sub-project rules):
 - All API responses use `Result<T>` wrapper, pagination uses `PageResult<T>`
 - Business errors throw `BusinessException` with `IResultCode` enum
 - Service layer uses interface + impl pattern
 - Schema changes append to `backend/src/main/resources/sql/schema.sql`
+
+**Testing (see `backend/.qoder/rules/testing-convention.md` for the full tiering):**
+- After implementing a Service method with real business logic (branching, validation, state transitions), write a JUnit 5 + Mockito unit test for it — **mandatory** for core logic (auth/token/sms/audit/status changes), **strongly recommended** for permission providers and `@Transactional` business rules
+- Do NOT use `@SpringBootTest` — mock dependencies with `@Mock`/`@InjectMocks`, no real DB/Redis
+- Skip tests for thin Controllers and plain CRUD Mapper delegation
+- Run `./gradlew test` after writing tests for a target and fix failures before moving to the next task
 
 ### Step 4: Execute Frontend Tasks
 
@@ -105,12 +113,18 @@ Follow the frontend tasks in `task.md` order. For each task:
 3. Mark the task as `[x]` in `task.md`
 
 **Execution order reference** (actual tasks come from task.md):
-- Model (Freezed) → DataSource → Repository (interface + impl + Provider) → ViewModel → View → Router registration
+- Model (Freezed) → DataSource → Repository (interface + impl + Provider) → ViewModel → View → Router registration → ViewModel state tests
 
 **Critical workflow constraints:**
 - After creating Model files, MUST run: `cd native_app && flutter pub run build_runner build --delete-conflicting-outputs`
 - Do NOT proceed to next task until build_runner completes successfully
 - Router registration: update `lib/core/router/app_router.dart`
+
+**Testing (see `native_app/.qoder/rules/testing-convention.md` for the full scope):**
+- After implementing a ViewModel/Notifier, write a state-transition test for it under `test/` (mirrors `lib/` path) — **recommended**, not mandatory
+- Do NOT write Widget tests (`testWidgets`) or test the `view/`/router layers
+- Do NOT add mocktail/mockito — hand-write a Fake implementing the existing Repository abstract class and override the provider via `ProviderContainer`
+- Run `flutter test` after writing tests for a target and fix failures before moving to the next task
 
 ### Step 5: Handle Ambiguity
 

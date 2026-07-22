@@ -21,7 +21,7 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # contextLoads() needs a live MySQL/Redis (see application-dev.yaml), which this
-      # minimal CI doesn't provision — skip test execution, keep compile + packaging.
-      - name: Build
-        run: ./gradlew build -x test
+      # Service-layer unit tests mock their dependencies (JUnit5 + Mockito, see
+      # backend/.qoder/rules/testing-convention.md) — no live MySQL/Redis needed in CI.
+      - name: Build and test
+        run: ./gradlew build

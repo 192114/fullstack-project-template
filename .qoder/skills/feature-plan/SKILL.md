@@ -331,6 +331,15 @@ The task.md header MUST include the targets metadata:
   - 文件: `backend/src/main/resources/sql/schema.sql`
   - 依赖: B1
 
+- [ ] **Task B8: 编写 Service 单元测试（必须，核心逻辑）**
+  - 文件: `backend/src/test/java/com/shadow/backend/{module}/service/impl/{Module}ServiceImplTest.java`
+  - 依赖: B5
+  - 范围: 见 `backend/.qoder/rules/testing-convention.md`；JUnit5 + Mockito，不启动 Spring 上下文，覆盖成功路径 + 每个业务分支/异常
+
+- [ ] **Task B9: 权限/事务相关测试（强烈建议，视是否涉及）**
+  - 依赖: B8
+  - 仅当本功能涉及权限提供者分支或 `@Transactional` 业务规则时才需要，否则可跳过并说明原因
+
 ## 前端任务 (Flutter)
 
 按以下顺序执行，每个任务完成后标记为 [x]:
@@ -359,6 +368,11 @@ The task.md header MUST include the targets metadata:
 - [ ] **Task F6: 注册路由**
   - 文件: `native_app/lib/core/router/app_router.dart`
   - 依赖: F5
+
+- [ ] **Task F7: 编写 ViewModel 状态测试（建议，不写 UI 测试）**
+  - 文件: `native_app/test/features/{feature}/view_model/{feature}_view_model_test.dart`
+  - 依赖: F4
+  - 范围: 见 `native_app/.qoder/rules/testing-convention.md`；用 Fake Repository + `ProviderContainer`，不引入 mocktail/mockito，不测 View/路由
 ```
 
 **IMPORTANT for task.md**:
