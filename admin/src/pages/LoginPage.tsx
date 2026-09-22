@@ -77,12 +77,25 @@ export function LoginPage() {
               <FieldError id="username-error" errors={[errors.username]} />
             </Field>
             <Field data-invalid={!!errors.password}>
-              <div className="flex items-center justify-between">
-                <FieldLabel htmlFor="password">密码</FieldLabel>
+              <FieldLabel htmlFor="password">密码</FieldLabel>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="请输入密码"
+                  className="h-11 rounded-xl border-0 bg-muted! pr-12 shadow-none"
+                  disabled={isSubmitting}
+                  aria-invalid={!!errors.password}
+                  aria-describedby={errors.password ? 'password-error' : undefined}
+                  {...register('password')}
+                />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
+                  className="absolute top-1/2 right-1 -translate-y-1/2"
+                  disabled={isSubmitting}
                   aria-label={showPassword ? '隐藏密码' : '显示密码'}
                   aria-pressed={showPassword}
                   onClick={() => setShowPassword((shown) => !shown)}
@@ -90,17 +103,6 @@ export function LoginPage() {
                   {showPassword ? <EyeOff /> : <Eye />}
                 </Button>
               </div>
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="current-password"
-                placeholder="请输入密码"
-                className="h-11 rounded-xl border-0 bg-muted! shadow-none"
-                disabled={isSubmitting}
-                aria-invalid={!!errors.password}
-                aria-describedby={errors.password ? 'password-error' : undefined}
-                {...register('password')}
-              />
               <FieldError id="password-error" errors={[errors.password]} />
             </Field>
           </FieldGroup>
