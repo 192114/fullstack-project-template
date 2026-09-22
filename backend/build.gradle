@@ -20,7 +20,7 @@ repositories {
 }
 
 ext {
-    mybatisPlusVersion = '3.5.16'
+    mybatisPlusVersion = '3.5.17'
     saTokenVersion = '1.45.0'
     argon2Version = '2.12'
     springdocVersion = '3.0.2'
