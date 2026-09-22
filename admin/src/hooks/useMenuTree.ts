@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { menuApi } from '@/services/api/menu'
+import { queryKeys } from '@/lib/queryKeys'
 import type { MenuTreeVO } from '@/types/api'
 
 /**
@@ -8,8 +9,8 @@ import type { MenuTreeVO } from '@/types/api'
  */
 export function useMenuTree(enabled = true) {
   return useQuery({
-    queryKey: ['menu-tree'],
-    queryFn: () => menuApi.tree(),
+    queryKey: queryKeys.menusTree,
+    queryFn: ({ signal }) => menuApi.tree(signal),
     enabled,
     staleTime: 1000 * 60 * 5,
   })
@@ -20,8 +21,8 @@ export function useMenuTree(enabled = true) {
  */
 export function useAllMenus(enabled = true) {
   return useQuery({
-    queryKey: ['menu-all'],
-    queryFn: () => menuApi.all(),
+    queryKey: queryKeys.menusAll,
+    queryFn: ({ signal }) => menuApi.all(signal),
     enabled,
   })
 }
@@ -29,10 +30,7 @@ export function useAllMenus(enabled = true) {
 /**
  * 从菜单树中查找匹配的路由
  */
-export function findMenuByPath(
-  menus: MenuTreeVO[],
-  path: string
-): MenuTreeVO | null {
+export function findMenuByPath(menus: MenuTreeVO[], path: string): MenuTreeVO | null {
   for (const menu of menus) {
     if (menu.path === path) return menu
     if (menu.children?.length) {

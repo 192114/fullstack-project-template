@@ -1,7 +1,5 @@
 package com.shadow.backend.common.util;
 
-import com.shadow.backend.common.util.StpAppUtil;
-
 public final class LoginUserUtil {
 
     private LoginUserUtil() {

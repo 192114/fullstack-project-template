@@ -2,17 +2,24 @@ package com.shadow.backend.common.util;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
 
-import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,6 +33,12 @@ class LoginAttemptGuardTest {
     private StringRedisTemplate redisTemplate;
     @Mock
     private ValueOperations<String, String> valueOperations;
+    @Captor
+    private ArgumentCaptor<RedisScript<Long>> scriptCaptor;
+    @Captor
+    private ArgumentCaptor<List<String>> keysCaptor;
+    @Captor
+    private ArgumentCaptor<String> ttlCaptor;
 
     @InjectMocks
     private LoginAttemptGuard loginAttemptGuard;
@@ -56,22 +69,22 @@ class LoginAttemptGuardTest {
 
     @Test
     void onLoginFailed_whenFirstFailure_setsExpiry() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment(KEY)).thenReturn(1L);
+        when(redisTemplate.execute(ArgumentMatchers.<RedisScript<Long>>any(),
+                eq(List.of(KEY)), eq("900"))).thenReturn(1L);
 
         loginAttemptGuard.onLoginFailed(SCENE, IDENTIFIER);
 
-        verify(redisTemplate).expire(KEY, Duration.ofMinutes(15));
+        verifyAtomicFailureScript();
     }
 
     @Test
     void onLoginFailed_whenSubsequentFailure_doesNotResetExpiry() {
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.increment(KEY)).thenReturn(3L);
+        when(redisTemplate.execute(ArgumentMatchers.<RedisScript<Long>>any(),
+                eq(List.of(KEY)), eq("900"))).thenReturn(3L);
 
         loginAttemptGuard.onLoginFailed(SCENE, IDENTIFIER);
 
-        verify(redisTemplate, never()).expire(KEY, Duration.ofMinutes(15));
+        verifyAtomicFailureScript();
     }
 
     @Test
@@ -79,5 +92,22 @@ class LoginAttemptGuardTest {
         loginAttemptGuard.onLoginSucceeded(SCENE, IDENTIFIER);
 
         verify(redisTemplate).delete(KEY);
+    }
+
+    private void verifyAtomicFailureScript() {
+        verify(redisTemplate).execute(scriptCaptor.capture(), keysCaptor.capture(), ttlCaptor.capture());
+        assertThat(scriptCaptor.getValue()).isInstanceOf(DefaultRedisScript.class);
+        assertThat(scriptCaptor.getValue().getResultType()).isEqualTo(Long.class);
+        assertThat(scriptCaptor.getValue().getScriptAsString()).isEqualTo("""
+                local count = redis.call('INCR', KEYS[1])
+                if count == 1 or redis.call('TTL', KEYS[1]) < 0 then
+                    redis.call('EXPIRE', KEYS[1], ARGV[1])
+                end
+                return count
+                """);
+        assertThat(keysCaptor.getValue()).containsExactly(KEY);
+        assertThat(ttlCaptor.getValue()).isEqualTo("900");
+        verifyNoMoreInteractions(redisTemplate);
+        verifyNoInteractions(valueOperations);
     }
 }

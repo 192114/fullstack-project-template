@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -17,8 +17,12 @@
   --color-muted-foreground: hsl(240 3.8% 46.1%);
   --color-accent: hsl(252 100% 96%);
   --color-accent-foreground: hsl(246 74% 63%);
-  --color-destructive: hsl(0 84.2% 60.2%);
+  --color-destructive: hsl(0 72% 45%);
   --color-destructive-foreground: hsl(0 0% 98%);
+  --color-success: hsl(142 72% 30%);
+  --color-warning: hsl(32 90% 35%);
+  --color-hero-background: hsl(224 50% 13%);
+  --color-hero-foreground: hsl(0 0% 100%);
   --color-border: hsl(240 5.9% 90%);
   --color-input: hsl(240 5.9% 90%);
   --color-ring: hsl(246 74% 63%);
@@ -52,7 +56,8 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
 }
 
@@ -71,8 +76,10 @@
   --color-muted-foreground: hsl(240 5% 64.9%);
   --color-accent: hsl(240 3.7% 15.9%);
   --color-accent-foreground: hsl(0 0% 98%);
-  --color-destructive: hsl(0 62.8% 30.6%);
-  --color-destructive-foreground: hsl(0 0% 98%);
+  --color-destructive: hsl(0 72% 65%);
+  --color-destructive-foreground: hsl(240 10% 3.9%);
+  --color-success: hsl(142 65% 60%);
+  --color-warning: hsl(40 90% 65%);
   --color-border: hsl(240 3.7% 15.9%);
   --color-input: hsl(240 3.7% 15.9%);
   --color-ring: hsl(240 4.9% 83.9%);

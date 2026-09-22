@@ -3,6 +3,7 @@ package com.shadow.backend.admin.role.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.shadow.backend.admin.auth.response.AdminResultCode;
+import com.shadow.backend.admin.menu.mapper.SysMenuMapper;
 import com.shadow.backend.admin.role.dto.AssignMenusRequest;
 import com.shadow.backend.admin.role.dto.CreateRoleRequest;
 import com.shadow.backend.admin.role.dto.UpdateRoleRequest;
@@ -18,8 +19,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,12 +29,16 @@ public class RoleServiceImpl implements RoleService {
 
     private final SysRoleMapper sysRoleMapper;
     private final SysRoleMenuMapper sysRoleMenuMapper;
+    private final SysMenuMapper sysMenuMapper;
 
     @Override
-    public PageResult<RoleVO> page(long current, long size, String name) {
+    public PageResult<RoleVO> page(long current, long size, String name, Integer status) {
         LambdaQueryWrapper<SysRole> wrapper = new LambdaQueryWrapper<>();
         if (name != null && !name.isBlank()) {
             wrapper.like(SysRole::getName, name);
+        }
+        if (status != null) {
+            wrapper.eq(SysRole::getStatus, status);
         }
         wrapper.orderByAsc(SysRole::getSortOrder);
 
@@ -135,18 +140,20 @@ public class RoleServiceImpl implements RoleService {
         if (role == null) {
             throw new BusinessException(AdminResultCode.ROLE_NOT_FOUND);
         }
-        // 先删除旧关联
+        List<Long> menuIds = request.getMenuIds() == null ? List.of()
+                : request.getMenuIds().stream().distinct().toList();
+        if (menuIds.stream().anyMatch(Objects::isNull)
+                || (!menuIds.isEmpty() && sysMenuMapper.selectByIds(menuIds).size() != menuIds.size())) {
+            throw new BusinessException(AdminResultCode.MENU_ASSIGNMENT_INVALID);
+        }
         sysRoleMenuMapper.delete(
                 new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, id)
         );
-        // 插入新关联
-        if (request.getMenuIds() != null && !request.getMenuIds().isEmpty()) {
-            for (Long menuId : request.getMenuIds()) {
-                SysRoleMenu rm = new SysRoleMenu();
-                rm.setRoleId(id);
-                rm.setMenuId(menuId);
-                sysRoleMenuMapper.insert(rm);
-            }
+        for (Long menuId : menuIds) {
+            SysRoleMenu rm = new SysRoleMenu();
+            rm.setRoleId(id);
+            rm.setMenuId(menuId);
+            sysRoleMenuMapper.insert(rm);
         }
     }
 

@@ -8,8 +8,8 @@ import com.shadow.backend.common.response.PageResult;
 
 public interface RoleService {
 
-    /** 分页查询角色 */
-    PageResult<RoleVO> page(long current, long size, String name);
+    /** 分页查询角色(支持名称模糊、状态过滤) */
+    PageResult<RoleVO> page(long current, long size, String name, Integer status);
 
     /** 全部角色(下拉用) */
     java.util.List<RoleVO> listAll();

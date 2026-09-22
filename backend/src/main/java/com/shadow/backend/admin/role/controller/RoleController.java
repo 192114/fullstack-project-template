@@ -8,6 +8,9 @@ import com.shadow.backend.admin.role.vo.RoleVO;
 import com.shadow.backend.common.response.PageResult;
 import com.shadow.backend.common.response.Result;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
+import org.springframework.validation.annotation.Validated;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +28,7 @@ import java.util.List;
  * 角色管理 Controller
  */
 @RestController
+@Validated
 @RequestMapping("/api/admin/roles")
 @RequiredArgsConstructor
 public class RoleController {
@@ -33,10 +37,12 @@ public class RoleController {
 
     @GetMapping
     public Result<PageResult<RoleVO>> page(
-            @RequestParam(defaultValue = "1") long current,
-            @RequestParam(defaultValue = "10") long size,
-            @RequestParam(required = false) String name) {
-        return Result.success(roleService.page(current, size, name));
+            @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码不能小于1") long current,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "每页条数不能小于1")
+            @Max(value = 100, message = "每页条数不能超过100") long size,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Integer status) {
+        return Result.success(roleService.page(current, size, name, status));
     }
 
     @GetMapping("/all")

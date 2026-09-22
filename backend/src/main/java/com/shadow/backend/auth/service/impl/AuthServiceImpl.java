@@ -1,6 +1,7 @@
 package com.shadow.backend.auth.service.impl;
 
-import com.shadow.backend.common.util.StpAppUtil;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import java.time.LocalDateTime;
 import com.shadow.backend.auth.constant.SmsScene;
 import com.shadow.backend.auth.dto.LoginResponse;
 import com.shadow.backend.auth.dto.PasswordLoginRequest;
@@ -22,6 +23,10 @@ import com.shadow.backend.common.exception.BusinessException;
 import com.shadow.backend.common.util.LoginAttemptGuard;
 import com.shadow.backend.common.util.LoginUserUtil;
 import com.shadow.backend.common.util.PasswordUtil;
+import com.shadow.backend.common.util.PhoneMaskUtil;
+import org.springframework.data.redis.core.StringRedisTemplate;
+
+import java.time.Duration;
 import com.shadow.backend.user.entity.User;
 import com.shadow.backend.user.mapper.UserMapper;
 import com.shadow.backend.user.response.UserResultCode;
@@ -46,6 +51,7 @@ public class AuthServiceImpl implements AuthService {
     private final SmsService smsService;
     private final TokenService tokenService;
     private final LoginAttemptGuard loginAttemptGuard;
+    private final StringRedisTemplate redisTemplate;
 
     @Override
     public LoginResponse loginByPassword(PasswordLoginRequest req) {
@@ -90,28 +96,27 @@ public class AuthServiceImpl implements AuthService {
         User user = new User();
         user.setPhone(req.getPhone());
         user.setPassword(passwordUtil.hash(req.getPassword()));
-        user.setNickname(StringUtils.hasText(req.getNickname()) ? req.getNickname() : "用户" + maskPhone(req.getPhone()));
+        user.setNickname(StringUtils.hasText(req.getNickname()) ? req.getNickname() : "用户" + PhoneMaskUtil.mask(req.getPhone()));
         user.setStatus(1);
         user.setAuditStatus(AuditStatus.PENDING.getValue());
         userMapper.insert(user);
 
-        log.info("用户注册成功: phone={}", req.getPhone());
+        log.info("用户注册成功: phone={}", PhoneMaskUtil.mask(req.getPhone()));
         return new RegisterResponse(userService.getById(user.getId()));
     }
 
     @Override
     public AuditStatusVO getAuditStatus(String phone) {
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(
+                "audit:query:limit:" + phone, "1", Duration.ofSeconds(60));
+        if (!Boolean.TRUE.equals(acquired)) {
+            throw new BusinessException(AuthResultCode.AUDIT_QUERY_TOO_FREQUENT);
+        }
         User user = userService.getByPhone(phone);
         if (user == null) {
             throw new BusinessException(AuthResultCode.PHONE_NOT_REGISTERED);
         }
-        return new AuditStatusVO(
-                user.getAuditStatus(),
-                user.getAuditRemark(),
-                user.getNickname(),
-                maskPhone(user.getPhone()),
-                user.getCreateTime()
-        );
+        return new AuditStatusVO(user.getAuditStatus(), PhoneMaskUtil.mask(user.getPhone()));
     }
 
     @Override
@@ -127,29 +132,46 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(AuthResultCode.RESUBMIT_NOT_REJECTED);
         }
 
-        user.setPassword(passwordUtil.hash(req.getPassword()));
-        if (StringUtils.hasText(req.getNickname())) {
-            user.setNickname(req.getNickname());
+        int updated = userMapper.update(null, new LambdaUpdateWrapper<User>()
+                .eq(User::getId, user.getId())
+                .eq(User::getAuditStatus, AuditStatus.REJECTED.getValue())
+                .set(User::getPassword, passwordUtil.hash(req.getPassword()))
+                .set(StringUtils.hasText(req.getNickname()), User::getNickname, req.getNickname())
+                .set(User::getAuditStatus, AuditStatus.PENDING.getValue())
+                .set(User::getAuditRemark, null)
+                .set(User::getAuditTime, null)
+                .set(User::getUpdateTime, LocalDateTime.now()));
+        if (updated == 0) {
+            throw new BusinessException(AuthResultCode.RESUBMIT_NOT_REJECTED);
         }
-        user.setAuditStatus(AuditStatus.PENDING.getValue());
-        user.setAuditRemark(null);
-        user.setAuditTime(null);
-        userMapper.updateById(user);
 
-        log.info("用户重新提交审核: phone={}", req.getPhone());
+        log.info("用户重新提交审核: phone={}", PhoneMaskUtil.mask(req.getPhone()));
         return new RegisterResponse(userService.getById(user.getId()));
     }
 
     @Override
     public RefreshTokenResponse refresh(RefreshTokenRequest req) {
+        // 刷新前复核账号状态：被禁用或审核未通过的账号 Refresh Token 直接失效
+        Long userId = tokenService.getUserIdByRefreshToken(req.getRefreshToken());
+        if (userId == null) {
+            throw new BusinessException(AuthResultCode.REFRESH_TOKEN_INVALID);
+        }
+        UserVO user = userService.getById(userId);
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            throw new BusinessException(UserResultCode.USER_DISABLED);
+        }
+        AuditStatus auditStatus = AuditStatus.fromValue(user.getAuditStatus());
+        if (auditStatus == AuditStatus.PENDING || auditStatus == AuditStatus.REJECTED) {
+            throw new BusinessException(AuthResultCode.REFRESH_TOKEN_INVALID);
+        }
+
         TokenPair tokenPair = tokenService.refreshToken(req.getRefreshToken());
         return new RefreshTokenResponse(tokenPair.getAccessToken(), tokenPair.getRefreshToken());
     }
 
     @Override
     public void logout() {
-        String refreshToken = (String) StpAppUtil.getSession().get("refreshToken");
-        tokenService.removeTokens(refreshToken);
+        tokenService.removeTokens(tokenService.getCurrentDeviceRefreshToken());
     }
 
     @Override
@@ -167,7 +189,9 @@ public class AuthServiceImpl implements AuthService {
         }
         user.setPassword(passwordUtil.hash(req.getNewPassword()));
         userMapper.updateById(user);
-        log.info("密码重置成功: phone={}", req.getPhone());
+        // 重置密码后撤销该用户全部会话，防止旧凭据继续使用
+        tokenService.revokeUserTokens(user.getId());
+        log.info("密码重置成功: phone={}", PhoneMaskUtil.mask(req.getPhone()));
     }
 
     private void checkAuditStatus(User user) {
@@ -198,10 +222,4 @@ public class AuthServiceImpl implements AuthService {
         return new LoginResponse(tokenPair.getAccessToken(), tokenPair.getRefreshToken(), userVO);
     }
 
-    private String maskPhone(String phone) {
-        if (phone == null || phone.length() < 11) {
-            return phone;
-        }
-        return phone.substring(0, 3) + "****" + phone.substring(7);
-    }
 }

@@ -1,6 +1,8 @@
 package com.shadow.backend.common.aspect;
 
+import com.shadow.backend.common.config.SecurityProperties;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -13,7 +15,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Slf4j
 @Aspect
 @Component
+@RequiredArgsConstructor
 public class RequestLogAspect {
+
+    private final SecurityProperties securityProperties;
 
     @Pointcut("execution(* com.shadow.backend..controller..*(..))")
     public void controllerPointcut() {
@@ -35,7 +40,7 @@ public class RequestLogAspect {
         } catch (Throwable ex) {
             long cost = System.currentTimeMillis() - start;
             log.warn("请求异常 | method={} | uri={} | ip={} | cost={}ms | error={}",
-                    method, uri, ip, cost, ex.getMessage());
+                    method, uri, ip, cost, ex.getClass().getSimpleName());
             throw ex;
         }
     }
@@ -46,9 +51,15 @@ public class RequestLogAspect {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
+        if (!securityProperties.isTrustedProxy()) {
+            return request.getRemoteAddr();
+        }
         String ip = request.getHeader("X-Forwarded-For");
-        if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {
-            return ip.split(",")[0].trim();
+        if (ip != null) {
+            String first = ip.split(",", 2)[0].trim();
+            if (!first.isEmpty() && !"unknown".equalsIgnoreCase(first)) {
+                return first;
+            }
         }
         ip = request.getHeader("X-Real-IP");
         if (ip != null && !ip.isBlank() && !"unknown".equalsIgnoreCase(ip)) {

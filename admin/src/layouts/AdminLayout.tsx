@@ -1,24 +1,61 @@
 import { useState, useMemo, useRef, useEffect, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { Outlet, useNavigate, useLocation } from '@tanstack/react-router'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
+import { Group as DropdownMenuGroup } from '@radix-ui/react-dropdown-menu'
+import { toast } from 'sonner'
+import { authApi } from '@/services/api/auth'
+import { queryKeys } from '@/lib/queryKeys'
+import { setTheme, useTheme } from '@/lib/theme'
+import { QueryState } from '@/components/business/QueryState'
+import { StatusBadge } from '@/components/business/StatusBadge'
+import { Button } from '@/components/ui/button'
 import {
-  LayoutDashboard, Users, Shield, Activity, FileText,
-  ChevronLeft, ChevronRight, ChevronDown,
-  LogOut, User, Menu as MenuIcon, UserCog, Smartphone,
-  Settings, Home, BarChart3, Database, Server, Mail,
-  Bell, Star, Folder, Sun, Loader2,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import {
+  LayoutDashboard,
+  Users,
+  Shield,
+  Activity,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  LogOut,
+  User,
+  Menu as MenuIcon,
+  UserCog,
+  Smartphone,
+  Settings,
+  Home,
+  BarChart3,
+  Database,
+  Server,
+  Mail,
+  Bell,
+  Star,
+  Folder,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Separator } from '@/components/ui/separator'
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import {
-  TooltipProvider, Tooltip, TooltipTrigger, TooltipContent,
-} from '@/components/ui/tooltip'
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useMenuTree } from '@/hooks/useMenuTree'
+import { tokenStore } from '@/lib/auth'
 import type { MenuTreeVO } from '@/types/api'
 
 /* ================================================================ *
@@ -26,9 +63,23 @@ import type { MenuTreeVO } from '@/types/api'
  * ================================================================ */
 
 const iconMap: Record<string, React.ElementType> = {
-  LayoutDashboard, Users, Shield, Activity, FileText, Menu: MenuIcon,
-  UserCog, Smartphone, Settings, Home, BarChart3, Database, Server,
-  Mail, Bell, Star, Folder,
+  LayoutDashboard,
+  Users,
+  Shield,
+  Activity,
+  FileText,
+  Menu: MenuIcon,
+  UserCog,
+  Smartphone,
+  Settings,
+  Home,
+  BarChart3,
+  Database,
+  Server,
+  Mail,
+  Bell,
+  Star,
+  Folder,
 }
 
 function getIcon(name: string | null): React.ElementType {
@@ -73,13 +124,16 @@ function findMenuPath(menus: MenuTreeVO[], pathname: string): MenuTreeVO[] | nul
 function hasActiveChild(menu: MenuTreeVO, isActive: (path: string) => boolean): boolean {
   if (menu.path && isActive(menu.path)) return true
   if (menu.children?.length) {
-    return menu.children.some(child => hasActiveChild(child, isActive))
+    return menu.children.some((child) => hasActiveChild(child, isActive))
   }
   return false
 }
 
 /** Find all parent menu IDs that should be auto-expanded (contain an active descendant) */
-function findExpandableParentIds(menus: MenuTreeVO[], isActive: (path: string) => boolean): number[] {
+function findExpandableParentIds(
+  menus: MenuTreeVO[],
+  isActive: (path: string) => boolean,
+): number[] {
   const result: number[] = []
   for (const menu of menus) {
     if (menu.children?.length) {
@@ -108,7 +162,7 @@ function FlyoutItem({
   isActive: (path: string) => boolean
   onNavigate: (menu: MenuTreeVO) => void
 }) {
-  const hasChildren = !!(menu.children?.length)
+  const hasChildren = !!menu.children?.length
   const active = menu.path ? isActive(menu.path) : false
 
   return (
@@ -119,21 +173,22 @@ function FlyoutItem({
           'flex w-full items-center rounded-lg px-3 py-2 text-sm transition-colors',
           active
             ? 'bg-primary/10 font-medium text-primary'
-            : 'text-gray-600 hover:bg-gray-100',
+            : 'text-muted-foreground hover:bg-muted',
         )}
         style={{ paddingLeft: `${level * 16 + 12}px` }}
       >
         {menu.name}
       </button>
-      {hasChildren && menu.children!.map(child => (
-        <FlyoutItem
-          key={child.id}
-          menu={child}
-          level={level + 1}
-          isActive={isActive}
-          onNavigate={onNavigate}
-        />
-      ))}
+      {hasChildren &&
+        menu.children!.map((child) => (
+          <FlyoutItem
+            key={child.id}
+            menu={child}
+            level={level + 1}
+            isActive={isActive}
+            onNavigate={onNavigate}
+          />
+        ))}
     </div>
   )
 }
@@ -146,6 +201,7 @@ function CollapsedFlyout({
   pos,
   onEnter,
   onLeave,
+  contentRef,
 }: {
   menu: MenuTreeVO
   isActive: (path: string) => boolean
@@ -153,19 +209,22 @@ function CollapsedFlyout({
   pos: { top: number; left: number }
   onEnter: () => void
   onLeave: () => void
+  contentRef: React.RefObject<HTMLDivElement | null>
 }) {
   return createPortal(
     <div
-      className="animate-in fade-in-0 zoom-in-95 fixed z-50 min-w-[200px] rounded-xl border border-gray-200 bg-white p-2 shadow-xl duration-200"
+      id={`flyout-${menu.id}`}
+      ref={contentRef}
+      className="animate-in fade-in-0 zoom-in-95 fixed z-50 max-h-[70dvh] min-w-[200px] overflow-auto rounded-xl border border-border bg-popover p-2 shadow-xl duration-200"
       style={{ top: pos.top, left: pos.left }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     >
-      <div className="mb-1 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+      <div className="mb-1 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {menu.name}
       </div>
-      <div className="space-y-0.5">
-        {menu.children?.map(child => (
+      <div className="flex flex-col gap-0.5">
+        {menu.children?.map((child) => (
           <FlyoutItem
             key={child.id}
             menu={child}
@@ -188,20 +247,18 @@ function MenuNode({
   menu,
   level,
   expanded,
-  toggleExpand,
   isActive,
   onMenuClick,
 }: {
   menu: MenuTreeVO
   level: number
   expanded: Set<number>
-  toggleExpand: (id: number) => void
   isActive: (path: string) => boolean
   onMenuClick: (menu: MenuTreeVO) => void
 }) {
   const Icon = getIcon(menu.icon)
   const active = menu.path ? isActive(menu.path) : false
-  const hasChildren = !!(menu.children?.length)
+  const hasChildren = !!menu.children?.length
   const isExpanded = expanded.has(menu.id)
   const childActive = hasChildren && !active && hasActiveChild(menu, isActive)
 
@@ -214,10 +271,12 @@ function MenuNode({
             ? 'bg-primary font-medium text-primary-foreground shadow-sm'
             : childActive
               ? 'font-medium text-primary'
-              : 'text-gray-600 hover:bg-gray-100',
+              : 'text-muted-foreground hover:bg-muted',
         )}
         style={{ paddingLeft: `${level * 16 + 12}px` }}
         onClick={() => onMenuClick(menu)}
+        aria-expanded={hasChildren ? isExpanded : undefined}
+        aria-current={active ? 'page' : undefined}
       >
         <Icon className="size-5 shrink-0" />
         <span className="flex-1 text-left">{menu.name}</span>
@@ -236,15 +295,15 @@ function MenuNode({
         <div
           className="grid transition-all duration-300 ease-in-out"
           style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
+          inert={!isExpanded}
         >
           <div className="overflow-hidden">
-            {menu.children!.map(child => (
+            {menu.children!.map((child) => (
               <MenuNode
                 key={child.id}
                 menu={child}
                 level={level + 1}
                 expanded={expanded}
-                toggleExpand={toggleExpand}
                 isActive={isActive}
                 onMenuClick={onMenuClick}
               />
@@ -272,10 +331,11 @@ function CollapsedMenuItem({
   const [showFlyout, setShowFlyout] = useState(false)
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const btnRef = useRef<HTMLButtonElement>(null)
+  const flyoutRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ top: 0, left: 0 })
 
   const Icon = getIcon(menu.icon)
-  const hasChildren = !!(menu.children?.length)
+  const hasChildren = !!menu.children?.length
   const childActive = hasActiveChild(menu, isActive)
 
   const handleEnter = () => {
@@ -288,23 +348,32 @@ function CollapsedMenuItem({
   }
 
   const handleLeave = () => {
-    hideTimer.current = setTimeout(() => setShowFlyout(false), 150)
+    hideTimer.current = setTimeout(() => {
+      if (
+        document.activeElement !== btnRef.current &&
+        !flyoutRef.current?.contains(document.activeElement)
+      )
+        setShowFlyout(false)
+    }, 150)
   }
 
   const flyoutEnter = () => {
     if (hideTimer.current) clearTimeout(hideTimer.current)
   }
 
-  const flyoutLeave = () => setShowFlyout(false)
+  const flyoutLeave = handleLeave
 
   const handleNavigate = (m: MenuTreeVO) => {
     onMenuClick(m)
     setShowFlyout(false)
   }
 
-  useEffect(() => () => {
-    if (hideTimer.current) clearTimeout(hideTimer.current)
-  }, [])
+  useEffect(
+    () => () => {
+      if (hideTimer.current) clearTimeout(hideTimer.current)
+    },
+    [],
+  )
 
   // No children — simple icon button with tooltip
   if (!hasChildren) {
@@ -313,12 +382,14 @@ function CollapsedMenuItem({
       <Tooltip>
         <TooltipTrigger asChild>
           <button
+            aria-label={menu.name}
+            aria-current={active ? 'page' : undefined}
             onClick={() => onMenuClick(menu)}
             className={cn(
               'flex w-full items-center justify-center rounded-lg px-2 py-2 text-sm transition-colors',
               active
                 ? 'bg-primary font-medium text-primary-foreground shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100',
+                : 'text-muted-foreground hover:bg-muted',
             )}
           >
             <Icon className="size-5 shrink-0" />
@@ -331,15 +402,41 @@ function CollapsedMenuItem({
 
   // Has children — icon button with hover flyout
   return (
-    <div onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+    <div
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+      onFocus={handleEnter}
+      onBlur={(event) => {
+        if (
+          event.relatedTarget !== btnRef.current &&
+          !flyoutRef.current?.contains(event.relatedTarget)
+        )
+          setShowFlyout(false)
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation()
+          btnRef.current?.focus()
+          setShowFlyout(false)
+        } else if (
+          event.target === btnRef.current &&
+          (event.key === 'ArrowDown' || event.key === 'ArrowRight')
+        ) {
+          event.preventDefault()
+          handleEnter()
+          requestAnimationFrame(() => flyoutRef.current?.querySelector('button')?.focus())
+        }
+      }}
+    >
       <button
         ref={btnRef}
+        aria-label={menu.name}
+        aria-expanded={showFlyout}
+        aria-controls={`flyout-${menu.id}`}
         onClick={() => onMenuClick(menu)}
         className={cn(
           'flex w-full items-center justify-center rounded-lg px-2 py-2 text-sm transition-colors',
-          childActive
-            ? 'text-primary'
-            : 'text-gray-600 hover:bg-gray-100',
+          childActive ? 'text-primary' : 'text-muted-foreground hover:bg-muted',
         )}
       >
         <Icon className="size-5 shrink-0" />
@@ -352,6 +449,7 @@ function CollapsedMenuItem({
           pos={pos}
           onEnter={flyoutEnter}
           onLeave={flyoutLeave}
+          contentRef={flyoutRef}
         />
       )}
     </div>
@@ -368,13 +466,32 @@ export function AdminLayout() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const location = useLocation()
-  const { data: menuTree, isLoading } = useMenuTree()
-
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    queryClient.clear()
-    navigate({ to: '/login' })
-  }
+  const { data: menuTree, isLoading, isError, refetch } = useMenuTree()
+  const theme = useTheme()
+  const [profileOpen, setProfileOpen] = useState(false)
+  const profile = useQuery({
+    queryKey: queryKeys.currentAdmin,
+    queryFn: () => authApi.getCurrentAdmin(),
+    enabled: profileOpen,
+  })
+  const logout = useMutation({
+    mutationKey: ['logout'],
+    mutationFn: async () => {
+      const token = tokenStore.get()
+      try {
+        await authApi.logout()
+      } catch {
+        toast.warning('服务端退出失败，已退出本地会话')
+      } finally {
+        // 旧会话的退出响应不能清除另一标签页刚建立的新会话。
+        if (tokenStore.get() === token) {
+          tokenStore.clear()
+          queryClient.clear()
+          await navigate({ to: '/login', replace: true })
+        }
+      }
+    },
+  })
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/'
@@ -387,7 +504,7 @@ export function AdminLayout() {
   }, [menuTree, location.pathname])
 
   const toggleExpand = (id: number) => {
-    setExpanded(prev => {
+    setExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
@@ -405,10 +522,10 @@ export function AdminLayout() {
     }
     const ids = findExpandableParentIds(menuTree, checkActive)
     if (ids.length === 0) return
-    setExpanded(prev => {
+    setExpanded((prev) => {
       const next = new Set(prev)
       let changed = false
-      ids.forEach(id => {
+      ids.forEach((id) => {
         if (!next.has(id)) {
           next.add(id)
           changed = true
@@ -436,7 +553,7 @@ export function AdminLayout() {
       {/* ======================== Sidebar (Full Height, Collapsible) ======================== */}
       <aside
         className={cn(
-          'flex flex-col border-r border-gray-200 bg-white transition-all duration-300',
+          'flex flex-col border-r border-border bg-card transition-all duration-300',
           collapsed ? 'w-16' : 'w-52',
         )}
       >
@@ -449,22 +566,24 @@ export function AdminLayout() {
         >
           {collapsed ? (
             <button
+              aria-label="展开侧栏"
               onClick={() => setCollapsed(false)}
-              className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 shadow-sm transition-transform hover:scale-105"
+              className="flex size-9 items-center justify-center rounded-lg bg-primary shadow-sm transition-transform hover:scale-105"
             >
-              <LayoutDashboard className="size-5 text-white" />
+              <LayoutDashboard className="size-5 text-primary-foreground" />
             </button>
           ) : (
             <>
               <div className="flex items-center gap-2">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 shadow-sm">
-                  <LayoutDashboard className="size-5 text-white" />
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary shadow-sm">
+                  <LayoutDashboard className="size-5 text-primary-foreground" />
                 </div>
-                <span className="text-lg font-bold text-gray-800">AdminPro</span>
+                <span className="text-lg font-bold text-foreground">AdminPro</span>
               </div>
               <button
+                aria-label="折叠侧栏"
                 onClick={() => setCollapsed(true)}
-                className="flex size-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-muted-foreground"
               >
                 <ChevronLeft className="size-4" />
               </button>
@@ -475,16 +594,20 @@ export function AdminLayout() {
         <Separator />
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-visible p-3">
-          {isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="size-6 animate-spin text-gray-400" />
-            </div>
+        <nav className="flex-1 flex flex-col gap-1 overflow-y-auto overflow-x-visible p-3">
+          {isLoading || isError ? (
+            <QueryState
+              isLoading={isLoading}
+              isError={isError}
+              isEmpty={false}
+              minHeight="100px"
+              onRetry={() => void refetch()}
+            />
           ) : (
             <TooltipProvider delayDuration={0}>
-              <div className="space-y-1">
+              <div className="flex flex-col gap-1">
                 {collapsed
-                  ? menuTree?.map(menu => (
+                  ? menuTree?.map((menu) => (
                       <CollapsedMenuItem
                         key={menu.id}
                         menu={menu}
@@ -492,13 +615,12 @@ export function AdminLayout() {
                         onMenuClick={handleMenuClick}
                       />
                     ))
-                  : menuTree?.map(menu => (
+                  : menuTree?.map((menu) => (
                       <MenuNode
                         key={menu.id}
                         menu={menu}
                         level={0}
                         expanded={expanded}
-                        toggleExpand={toggleExpand}
                         isActive={isActive}
                         onMenuClick={handleMenuClick}
                       />
@@ -510,10 +632,11 @@ export function AdminLayout() {
 
         {/* Collapse Toggle (bottom — only when collapsed) */}
         {collapsed && (
-          <div className="shrink-0 border-t border-gray-200 p-3">
+          <div className="shrink-0 border-t border-border p-3">
             <button
+              aria-label="展开侧栏"
               onClick={() => setCollapsed(false)}
-              className="flex w-full items-center justify-center rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              className="flex w-full items-center justify-center rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-muted-foreground"
             >
               <ChevronRight className="size-5" />
             </button>
@@ -527,11 +650,17 @@ export function AdminLayout() {
         <header className="flex h-16 shrink-0 items-center justify-between px-6">
           {/* Breadcrumb Navigation */}
           <nav className="flex items-center gap-1.5 text-sm">
-            <span className="text-gray-400">首页</span>
+            <span className="text-muted-foreground">首页</span>
             {breadcrumbs.map((crumb, i) => (
               <Fragment key={crumb.id}>
-                <ChevronRight className="size-3.5 text-gray-300" />
-                <span className={i === breadcrumbs.length - 1 ? 'font-medium text-gray-800' : 'text-gray-500'}>
+                <ChevronRight className="size-3.5 text-muted-foreground" />
+                <span
+                  className={
+                    i === breadcrumbs.length - 1
+                      ? 'font-medium text-foreground'
+                      : 'text-muted-foreground'
+                  }
+                >
                   {crumb.name}
                 </span>
               </Fragment>
@@ -539,43 +668,84 @@ export function AdminLayout() {
           </nav>
 
           <div className="flex items-center gap-2">
-            {/* Theme Toggle */}
-            <button className="flex size-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700">
-              <Sun className="size-5" />
-            </button>
-
-            {/* User Avatar */}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={theme === 'dark' ? '切换浅色主题' : '切换深色主题'}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              {theme === 'dark' ? <Sun /> : <Moon />}
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="relative">
-                  <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500">
-                    <User className="size-5 text-white" />
-                  </div>
-                  <span className="absolute bottom-0 right-0 size-2.5 rounded-full border-2 border-white bg-green-500" />
-                </button>
+                <Button variant="secondary" size="icon" aria-label="我的账户">
+                  <User />
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuLabel>我的账户</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate({ to: '/' })}>
-                  <User className="size-4" />
-                  个人信息
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                  <LogOut className="size-4" />
-                  退出登录
-                </DropdownMenuItem>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
+                    <User />
+                    个人信息
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={logout.isPending}
+                    onSelect={() => {
+                      if (!queryClient.isMutating({ mutationKey: ['logout'] })) logout.mutate()
+                    }}
+                  >
+                    <LogOut />
+                    退出登录
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-4 sm:p-6">
           <Outlet />
         </main>
       </div>
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>个人信息</DialogTitle>
+            <DialogDescription>当前登录的管理员账户</DialogDescription>
+          </DialogHeader>
+          <QueryState
+            isLoading={profile.isLoading}
+            isError={profile.isError}
+            isEmpty={false}
+            onRetry={() => void profile.refetch()}
+          />
+          {profile.isSuccess && (
+            <dl className="flex flex-col gap-4 rounded-2xl bg-muted/50 p-4 text-sm">
+              <div>
+                <dt className="text-muted-foreground">用户名</dt>
+                <dd>{profile.data.username}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">昵称</dt>
+                <dd>{profile.data.nickname || '-'}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">邮箱</dt>
+                <dd className="break-all">{profile.data.email || '-'}</dd>
+              </div>
+              <div>
+                <dt className="mb-1 text-muted-foreground">状态</dt>
+                <dd>
+                  <StatusBadge status={profile.data.status} />
+                </dd>
+              </div>
+            </dl>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

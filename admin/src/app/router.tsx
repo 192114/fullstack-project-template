@@ -3,21 +3,54 @@ import {
   createRoute,
   createRouter,
   redirect,
+  lazyRouteComponent,
   Outlet,
+  Link,
+  useRouter,
 } from '@tanstack/react-router'
+import { Loader2, TriangleAlert } from 'lucide-react'
 import { AuthLayout } from '@/layouts/AuthLayout'
-import { AdminLayout } from '@/layouts/AdminLayout'
 import { LoginPage } from '@/pages/LoginPage'
-import { HomePage } from '@/pages/HomePage'
-import { MenuPage } from '@/pages/MenuPage'
-import { RolePage } from '@/pages/RolePage'
-import { AdminUserPage } from '@/pages/AdminUserPage'
-import { AppUserPage } from '@/pages/AppUserPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
-import { ForbiddenPage } from '@/pages/ForbiddenPage'
 import { authApi } from '@/services/api/auth'
 import { hasPermission, findFirstPermittedRoute } from '@/lib/permission'
+import { queryKeys } from '@/lib/queryKeys'
+import { tokenStore } from '@/lib/auth'
 import { queryClient } from '@/app/queryClient'
+import { Button } from '@/components/ui/button'
+
+function RoutePending() {
+  return (
+    <div
+      className="flex h-full min-h-[300px] items-center justify-center"
+      role="status"
+      aria-label="加载中"
+    >
+      <Loader2 className="size-6 animate-spin text-muted-foreground" />
+    </div>
+  )
+}
+
+function RouteError() {
+  const router = useRouter()
+  return (
+    <div
+      className="flex h-full min-h-[300px] flex-col items-center justify-center gap-3"
+      role="alert"
+    >
+      <TriangleAlert className="size-8 text-destructive" />
+      <p className="text-sm text-muted-foreground">页面加载失败，请稍后重试</p>
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" onClick={() => router.invalidate()}>
+          重试
+        </Button>
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/">返回首页</Link>
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 // Root route
 const rootRoute = createRootRoute({
@@ -43,21 +76,20 @@ const loginRoute = createRoute({
 const adminRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'admin',
-  component: AdminLayout,
+  component: lazyRouteComponent(() => import('@/layouts/AdminLayout'), 'AdminLayout'),
   beforeLoad: async () => {
     // Check authentication - redirect to login if not authenticated
-    const token = localStorage.getItem('token')
+    const token = tokenStore.get()
     if (!token) {
       throw redirect({
         to: '/login',
       })
     }
-    // Prefetch permissions and store in context for child route guards.
-    // Uses the same queryKey as usePermissions hook so the cache is shared.
-    const permissions = await queryClient.ensureQueryData({
-      queryKey: ['permissions'],
-      queryFn: () => authApi.getPermissions(),
+    const permissions = await queryClient.fetchQuery({
+      queryKey: queryKeys.permissions,
+      queryFn: ({ signal }) => authApi.getPermissions(signal),
     })
+    if (token !== tokenStore.get()) throw redirect({ to: '/login' })
     return { permissions }
   },
 })
@@ -66,7 +98,7 @@ const adminRoute = createRoute({
 const homeRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/',
-  component: HomePage,
+  component: lazyRouteComponent(() => import('@/pages/HomePage'), 'HomePage'),
   beforeLoad: ({ context }) => {
     if (!hasPermission(context.permissions, 'dashboard:view')) {
       // No dashboard permission — redirect to first permitted route instead of 403
@@ -80,7 +112,7 @@ const homeRoute = createRoute({
 const menuRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/menus',
-  component: MenuPage,
+  component: lazyRouteComponent(() => import('@/pages/MenuPage'), 'MenuPage'),
   beforeLoad: ({ context }) => {
     if (!hasPermission(context.permissions, 'menu:list')) {
       throw redirect({ to: '/403' })
@@ -92,7 +124,7 @@ const menuRoute = createRoute({
 const roleRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/roles',
-  component: RolePage,
+  component: lazyRouteComponent(() => import('@/pages/RolePage'), 'RolePage'),
   beforeLoad: ({ context }) => {
     if (!hasPermission(context.permissions, 'role:list')) {
       throw redirect({ to: '/403' })
@@ -104,7 +136,7 @@ const roleRoute = createRoute({
 const adminUserRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/admin-users',
-  component: AdminUserPage,
+  component: lazyRouteComponent(() => import('@/pages/AdminUserPage'), 'AdminUserPage'),
   beforeLoad: ({ context }) => {
     if (!hasPermission(context.permissions, 'admin-user:list')) {
       throw redirect({ to: '/403' })
@@ -116,7 +148,7 @@ const adminUserRoute = createRoute({
 const appUserRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/app-users',
-  component: AppUserPage,
+  component: lazyRouteComponent(() => import('@/pages/AppUserPage'), 'AppUserPage'),
   beforeLoad: ({ context }) => {
     if (!hasPermission(context.permissions, 'user:list')) {
       throw redirect({ to: '/403' })
@@ -128,7 +160,7 @@ const appUserRoute = createRoute({
 const forbiddenRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: '/403',
-  component: ForbiddenPage,
+  component: lazyRouteComponent(() => import('@/pages/ForbiddenPage'), 'ForbiddenPage'),
 })
 
 // Route tree
@@ -149,6 +181,8 @@ export const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 0,
+  defaultPendingComponent: RoutePending,
+  defaultErrorComponent: RouteError,
 })
 
 // Register router for type safety

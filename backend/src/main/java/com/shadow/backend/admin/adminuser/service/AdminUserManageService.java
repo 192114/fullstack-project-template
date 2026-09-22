@@ -8,8 +8,8 @@ import com.shadow.backend.common.response.PageResult;
 
 public interface AdminUserManageService {
 
-    /** 分页查询管理员 */
-    PageResult<AdminUserManageVO> page(long current, long size, String username);
+    /** 分页查询管理员(支持用户名模糊、角色ID、状态过滤) */
+    PageResult<AdminUserManageVO> page(long current, long size, String username, Long roleId, Integer status);
 
     /** 管理员详情(含角色) */
     AdminUserManageVO getById(Long id);

@@ -51,4 +51,15 @@ public class StpAppUtil {
     public static SaSession getSession() {
         return stpLogic.getSession();
     }
+
+    public static SaSession getTokenSession() {
+        return stpLogic.getTokenSession();
+    }
+
+    /**
+     * 撤销指定用户的全部会话（重置密码/禁用/删除用户后调用，所有设备立即下线）。
+     */
+    public static void logoutUser(Long userId) {
+        stpLogic.logout(userId);
+    }
 }

@@ -10,7 +10,6 @@ import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -24,7 +23,7 @@ public class TraceIdFilter extends OncePerRequestFilter {
     protected void doFilterInternal(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull FilterChain filterChain)
             throws ServletException, IOException {
         String traceId = request.getHeader(AppConstant.TRACE_ID_HEADER);
-        if (!StringUtils.hasText(traceId)) {
+        if (traceId == null || !traceId.matches("[A-Za-z0-9_-]{1,32}")) {
             traceId = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         }
         MDC.put(AppConstant.TRACE_ID, traceId);

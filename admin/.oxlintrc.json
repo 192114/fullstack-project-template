@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "react-hooks", "typescript", "unicorn", "oxc"],
+  "env": {
+    "browser": true
+  },
+  "settings": {
+    "react": {
+      "version": "19.2.7"
+    }
+  },
+  "categories": {
+    "correctness": "error"
+  }
+}

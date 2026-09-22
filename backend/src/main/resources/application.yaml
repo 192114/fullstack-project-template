@@ -42,6 +42,10 @@ app:
     allowed-headers: "*"
     allow-credentials: false
     max-age: 3600
+  security:
+    trusted-proxy: false
+  sms:
+    daily-limit: 10
 
 springdoc:
   swagger-ui:

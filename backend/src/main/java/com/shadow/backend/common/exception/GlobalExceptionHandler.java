@@ -9,6 +9,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.MessageSourceResolvable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -20,10 +22,12 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -32,8 +36,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<Result<Void>> handleBusinessException(BusinessException ex) {
-        log.warn("业务异常: code={}, message={}", ex.getCode(), ex.getMessage());
+        log.warn("业务异常: code={}", ex.getCode());
         return ResponseEntity.ok(Result.fail(ex.getCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Result<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("数据完整性冲突: type={}", ex.getClass().getSimpleName());
+        return ResponseEntity.ok(Result.fail(ResultCode.CONFLICT.getCode(), ResultCode.CONFLICT.getMsg()));
     }
 
     @ExceptionHandler(NotLoginException.class)
@@ -54,7 +64,8 @@ public class GlobalExceptionHandler {
             ConstraintViolationException.class,
             MissingServletRequestParameterException.class,
             MethodArgumentTypeMismatchException.class,
-            HttpMessageNotReadableException.class
+            HttpMessageNotReadableException.class,
+            HandlerMethodValidationException.class
     })
     public ResponseEntity<Result<Void>> handleValidationException(Exception ex) {
         String message = resolveValidationMessage(ex);
@@ -69,7 +80,8 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<Result<Void>> handleHttpStatusException(Exception ex, HttpServletRequest request) {
         HttpStatus status = resolveHttpStatus(ex);
-        log.warn("HTTP 异常: status={}, uri={}, message={}", status.value(), request.getRequestURI(), ex.getMessage());
+        log.warn("HTTP 异常: status={}, uri={}, type={}",
+                status.value(), request.getRequestURI(), ex.getClass().getName());
         return ResponseEntity.status(status).body(Result.fail(status.value(), ex.getMessage()));
     }
 
@@ -85,7 +97,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Result<Void>> handleException(Exception ex, HttpServletRequest request) {
-        log.error("系统异常: uri={}", request.getRequestURI(), ex);
+        log.error("系统异常: uri={}, type={}, stack={}",
+                request.getRequestURI(), ex.getClass().getName(), ex.getStackTrace());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Result.fail(ResultCode.INTERNAL_ERROR.getCode(), ResultCode.INTERNAL_ERROR.getMsg()));
     }
@@ -106,7 +119,14 @@ public class GlobalExceptionHandler {
                     .map(ConstraintViolation::getMessage)
                     .collect(Collectors.joining("; "));
         }
-        return ex.getMessage() != null ? ex.getMessage() : ResultCode.BAD_REQUEST.getMsg();
+        if (ex instanceof HandlerMethodValidationException methodValidationException) {
+            String message = methodValidationException.getAllErrors().stream()
+                    .map(MessageSourceResolvable::getDefaultMessage)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.joining("; "));
+            return message.isBlank() ? ResultCode.BAD_REQUEST.getMsg() : message;
+        }
+        return ResultCode.BAD_REQUEST.getMsg();
     }
 
     private HttpStatus resolveHttpStatus(Exception ex) {

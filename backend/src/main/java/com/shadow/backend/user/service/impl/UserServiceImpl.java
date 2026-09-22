@@ -1,7 +1,11 @@
 package com.shadow.backend.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.shadow.backend.common.response.ResultCode;
+import org.springframework.transaction.annotation.Transactional;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.shadow.backend.auth.service.TokenService;
 import com.shadow.backend.common.exception.BusinessException;
 import com.shadow.backend.common.response.PageResult;
 import com.shadow.backend.common.util.PasswordUtil;
@@ -27,6 +31,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserMapper userMapper;
     private final PasswordUtil passwordUtil;
+    private final TokenService tokenService;
 
     @Override
     public UserVO create(CreateUserRequest request) {
@@ -46,25 +51,31 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public UserVO update(Long id, UpdateUserRequest request) {
         User user = getEntityById(id);
-        if (StringUtils.hasText(request.getNickname())) {
-            user.setNickname(request.getNickname());
+        boolean hasNickname = StringUtils.hasText(request.getNickname());
+        boolean hasEmail = StringUtils.hasText(request.getEmail());
+        if (!hasNickname && !hasEmail && request.getStatus() == null) {
+            return toVO(user);
         }
-        if (StringUtils.hasText(request.getEmail())) {
-            user.setEmail(request.getEmail());
+        userMapper.update(null, new LambdaUpdateWrapper<User>()
+                .eq(User::getId, id)
+                .set(hasNickname, User::getNickname, request.getNickname())
+                .set(hasEmail, User::getEmail, request.getEmail())
+                .set(request.getStatus() != null, User::getStatus, request.getStatus())
+                .set(User::getUpdateTime, LocalDateTime.now()));
+        if (Integer.valueOf(0).equals(request.getStatus())) {
+            tokenService.revokeUserTokens(id);
         }
-        if (request.getStatus() != null) {
-            user.setStatus(request.getStatus());
-        }
-        userMapper.updateById(user);
-        return toVO(user);
+        return getById(id);
     }
 
     @Override
     public void delete(Long id) {
         getEntityById(id);
         userMapper.deleteById(id);
+        tokenService.revokeUserTokens(id);
     }
 
     @Override
@@ -97,19 +108,22 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public UserVO updateProfile(Long userId, UpdateProfileRequest request) {
         User user = getEntityById(userId);
-        if (StringUtils.hasText(request.getNickname())) {
-            user.setNickname(request.getNickname());
+        boolean hasNickname = StringUtils.hasText(request.getNickname());
+        boolean hasEmail = StringUtils.hasText(request.getEmail());
+        boolean hasAvatar = StringUtils.hasText(request.getAvatar());
+        if (!hasNickname && !hasEmail && !hasAvatar) {
+            return toVO(user);
         }
-        if (StringUtils.hasText(request.getEmail())) {
-            user.setEmail(request.getEmail());
-        }
-        if (StringUtils.hasText(request.getAvatar())) {
-            user.setAvatar(request.getAvatar());
-        }
-        userMapper.updateById(user);
-        return toVO(user);
+        userMapper.update(null, new LambdaUpdateWrapper<User>()
+                .eq(User::getId, userId)
+                .set(hasNickname, User::getNickname, request.getNickname())
+                .set(hasEmail, User::getEmail, request.getEmail())
+                .set(hasAvatar, User::getAvatar, request.getAvatar())
+                .set(User::getUpdateTime, LocalDateTime.now()));
+        return getById(userId);
     }
 
     @Override
@@ -123,16 +137,24 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public UserVO audit(Long id, Integer auditStatus, String auditRemark) {
-        User user = getEntityById(id);
-        if (user.getAuditStatus() != null && user.getAuditStatus() != 0) {
+        if (!Integer.valueOf(1).equals(auditStatus) && !Integer.valueOf(2).equals(auditStatus)) {
+            throw new BusinessException(ResultCode.BAD_REQUEST);
+        }
+        getEntityById(id);
+        LocalDateTime now = LocalDateTime.now();
+        int updated = userMapper.update(null, new LambdaUpdateWrapper<User>()
+                .eq(User::getId, id)
+                .eq(User::getAuditStatus, 0)
+                .set(User::getAuditStatus, auditStatus)
+                .set(User::getAuditRemark, auditRemark)
+                .set(User::getAuditTime, now)
+                .set(User::getUpdateTime, now));
+        if (updated == 0) {
             throw new BusinessException(UserResultCode.USER_ALREADY_AUDITED);
         }
-        user.setAuditStatus(auditStatus);
-        user.setAuditRemark(auditRemark);
-        user.setAuditTime(LocalDateTime.now());
-        userMapper.updateById(user);
-        return toVO(user);
+        return getById(id);
     }
 
     private User getEntityById(Long id) {

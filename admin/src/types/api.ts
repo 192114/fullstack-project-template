@@ -70,7 +70,7 @@ export interface MenuTreeVO {
   id: number
   parentId: number
   name: string
-  type: number  // 1=目录 2=菜单 3=按钮
+  type: number // 1=目录 2=菜单 3=按钮
   path: string | null
   icon: string | null
   sortOrder: number

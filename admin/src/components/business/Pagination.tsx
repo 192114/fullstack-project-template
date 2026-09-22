@@ -31,35 +31,45 @@ export function Pagination({
   pageSize = 10,
   onPageChange,
 }: PaginationProps) {
-  if (totalPages <= 1) return null
+  // 单页时仅展示总数，不渲染页码组
+  if (totalPages <= 1) {
+    return (
+      <div className="flex items-center justify-between px-1 py-3">
+        <span className="text-sm text-muted-foreground">共 {total} 条数据</span>
+      </div>
+    )
+  }
 
   const pages = buildPageList(current, totalPages)
 
   return (
-    <div className="flex items-center justify-between px-1 py-3">
-      <span className="text-sm text-gray-500">共 {total} 条数据</span>
+    <nav aria-label="分页" className="flex items-center justify-between px-1 py-3">
+      <span className="text-sm text-muted-foreground">共 {total} 条数据</span>
       <div className="flex items-center gap-1.5">
         <button
+          aria-label="上一页"
           disabled={current <= 1}
           onClick={() => onPageChange(current - 1)}
-          className="flex size-8 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronLeft className="size-4" />
         </button>
         {pages.map((page, i) =>
           page === 'ellipsis' ? (
-            <span key={`e${i}`} className="px-1.5 text-gray-400">
+            <span key={`e${i}`} className="px-1.5 text-muted-foreground">
               ...
             </span>
           ) : (
             <button
               key={page}
+              aria-label={`第 ${page} 页`}
+              aria-current={page === current ? 'page' : undefined}
               onClick={() => onPageChange(page)}
               className={cn(
                 'flex min-w-8 items-center justify-center rounded-lg border px-2 text-sm transition-colors',
                 page === current
                   ? 'border-primary bg-primary/5 font-medium text-primary'
-                  : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+                  : 'border-border text-foreground hover:bg-muted',
               )}
             >
               {page}
@@ -67,14 +77,15 @@ export function Pagination({
           ),
         )}
         <button
+          aria-label="下一页"
           disabled={current >= totalPages}
           onClick={() => onPageChange(current + 1)}
-          className="flex size-8 items-center justify-center rounded-lg border border-gray-200 text-gray-400 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronRight className="size-4" />
         </button>
-        <span className="ml-2 text-sm text-gray-400">{pageSize} 条/页</span>
+        <span className="ml-2 text-sm text-muted-foreground">{pageSize} 条/页</span>
       </div>
-    </div>
+    </nav>
   )
 }

@@ -1,407 +1,548 @@
-import { useState, useCallback } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import {
-  Plus, ChevronRight, ChevronDown, Loader2,
-  Search, RotateCcw, AlertTriangle, LayoutDashboard,
-} from 'lucide-react'
+import { useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Controller, useForm, useWatch } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod/v4'
+import { Plus, ChevronRight, ChevronDown, Loader2, RotateCcw } from 'lucide-react'
+import { toast } from 'sonner'
+import { HasPermission } from '@/components/HasPermission'
+import { QueryState } from '@/components/business/QueryState'
+import { StatusBadge } from '@/components/business/StatusBadge'
+import { useAllMenus } from '@/hooks/useMenuTree'
+import { queryKeys } from '@/lib/queryKeys'
+import { invalidateAccess } from '@/lib/queryInvalidation'
+import { menuApi } from '@/services/api/menu'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
+import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
-import { cn } from '@/lib/utils'
-import { HasPermission } from '@/components/HasPermission'
-import { menuApi } from '@/services/api/menu'
-import { useAllMenus } from '@/hooks/useMenuTree'
 import type { MenuTreeVO, CreateMenuRequest } from '@/types/api'
 
-const TYPE_LABELS: Record<number, { text: string; className: string }> = {
-  1: { text: '目录', className: 'bg-blue-100 text-blue-700' },
-  2: { text: '菜单', className: 'bg-green-100 text-green-700' },
-  3: { text: '按钮', className: 'bg-gray-100 text-gray-600' },
+const MENU_WRITE_KEY = ['menu-write'] as const
+const TYPE_LABELS: Record<number, string> = { 1: '目录', 2: '菜单', 3: '按钮' }
+const menuSchema = z
+  .object({
+    parentId: z.number().int().nonnegative(),
+    name: z.string().trim().min(1, '请输入菜单名称'),
+    type: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    path: z.string().trim(),
+    icon: z.string().trim(),
+    sortOrder: z.number({ error: '请输入排序数字' }).int('排序必须是整数'),
+    permission: z.string().trim(),
+    visible: z.union([z.literal(0), z.literal(1)]),
+    status: z.union([z.literal(0), z.literal(1)]),
+  })
+  .superRefine((value, ctx) => {
+    if (value.type === 2 && !value.path)
+      ctx.addIssue({ code: 'custom', path: ['path'], message: '菜单必须填写路由路径' })
+    if (value.type === 3 && !value.permission)
+      ctx.addIssue({ code: 'custom', path: ['permission'], message: '按钮必须填写权限标识' })
+  })
+type MenuForm = z.infer<typeof menuSchema>
+type MenuOperation =
+  { action: 'save'; id?: number; data: CreateMenuRequest } | { action: 'delete'; id: number }
+const EMPTY_FORM: MenuForm = {
+  parentId: 0,
+  name: '',
+  type: 2,
+  path: '',
+  icon: '',
+  sortOrder: 0,
+  permission: '',
+  visible: 1,
+  status: 1,
 }
 
-interface FlatMenu extends MenuTreeVO {
-  depth: number
-  hasChildren: boolean
+function filterTree(menus: MenuTreeVO[], search: string): MenuTreeVO[] {
+  return menus.flatMap((menu) => {
+    if (menu.name.toLowerCase().includes(search)) return [menu]
+    const children = filterTree(menu.children ?? [], search)
+    return children.length ? [{ ...menu, children }] : []
+  })
 }
-
-function flattenTree(menus: MenuTreeVO[], expanded: Set<number>, depth = 0): FlatMenu[] {
-  const result: FlatMenu[] = []
-  for (const menu of menus) {
-    const hasChildren = menu.children && menu.children.length > 0
-    result.push({ ...menu, depth, hasChildren })
-    if (hasChildren && expanded.has(menu.id)) {
-      result.push(...flattenTree(menu.children, expanded, depth + 1))
-    }
-  }
-  return result
+function flattenTree(
+  menus: MenuTreeVO[],
+  expanded: Set<number>,
+  forceExpand: boolean,
+  depth = 0,
+): (MenuTreeVO & { depth: number })[] {
+  return menus.flatMap((menu) => [
+    { ...menu, depth },
+    ...(forceExpand || expanded.has(menu.id)
+      ? flattenTree(menu.children ?? [], expanded, forceExpand, depth + 1)
+      : []),
+  ])
 }
-
-function collectMenuOptions(menus: MenuTreeVO[], depth = 0): { id: number; label: string }[] {
-  const result: { id: number; label: string }[] = [{ id: 0, label: '根目录' }]
-  for (const menu of menus) {
-    if (menu.type !== 3) {
-      result.push({ id: menu.id, label: `${'　'.repeat(depth)}${menu.name}` })
-      if (menu.children?.length) {
-        result.push(...collectMenuOptions(menu.children, depth + 1).filter(o => o.id !== 0))
-      }
-    }
-  }
-  return result
+function collectParentOptions(
+  menus: MenuTreeVO[],
+  excludedId?: number,
+  depth = 0,
+): { id: number; label: string }[] {
+  return menus.flatMap((menu) =>
+    menu.id === excludedId || menu.type === 3
+      ? []
+      : [
+          { id: menu.id, label: `${'　'.repeat(depth)}${menu.name}` },
+          ...collectParentOptions(menu.children ?? [], excludedId, depth + 1),
+        ],
+  )
 }
 
 export function MenuPage() {
-  const queryClient = useQueryClient()
-  const { data: menus, isLoading } = useAllMenus()
-  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const client = useQueryClient()
+  const query = useAllMenus()
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set())
   const [searchName, setSearchName] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [editingMenu, setEditingMenu] = useState<MenuTreeVO | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<MenuTreeVO | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [form, setForm] = useState<CreateMenuRequest>({
-    parentId: 0, name: '', type: 2, path: '', icon: '', sortOrder: 0,
-    permission: '', visible: 1, status: 1,
-  })
-
-  const flatMenus = menus ? flattenTree(menus, expanded) : []
-  const parentOptions = menus ? collectMenuOptions(menus) : [{ id: 0, label: '根目录' }]
-
-  const toggleExpand = useCallback((id: number) => {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }, [])
-
-  const openCreate = () => {
-    setEditingMenu(null)
-    setForm({ parentId: 0, name: '', type: 2, path: '', icon: '', sortOrder: 0,
-      permission: '', visible: 1, status: 1 })
-    setDialogOpen(true)
-  }
-
-  const openEdit = (menu: MenuTreeVO) => {
-    setEditingMenu(menu)
-    setForm({
-      parentId: menu.parentId, name: menu.name, type: menu.type,
-      path: menu.path || '', icon: menu.icon || '', sortOrder: menu.sortOrder,
-      permission: menu.permission || '', visible: menu.visible, status: menu.status,
-    })
-    setDialogOpen(true)
-  }
-
-  const openDelete = (menu: MenuTreeVO) => {
-    setDeleteTarget(menu)
-    setDeleteDialogOpen(true)
-  }
-
-  const handleSubmit = async () => {
-    setSubmitting(true)
-    try {
-      if (editingMenu) {
-        await menuApi.update(editingMenu.id, form)
-      } else {
-        await menuApi.create(form)
-      }
+  const form = useForm<MenuForm>({ resolver: zodResolver(menuSchema), defaultValues: EMPTY_FORM })
+  const type = useWatch({ control: form.control, name: 'type' })
+  const { errors } = form.formState
+  const search = searchName.trim().toLowerCase()
+  const menus = query.data ?? []
+  const rows = flattenTree(search ? filterTree(menus, search) : menus, expanded, !!search)
+  const parentOptions = [
+    { id: 0, label: '根目录' },
+    ...collectParentOptions(menus, editingMenu?.id),
+  ]
+  const mutation = useMutation({
+    mutationKey: MENU_WRITE_KEY,
+    mutationFn: async (operation: MenuOperation) => {
+      if (operation.action === 'delete') return menuApi.delete(operation.id)
+      return operation.id === undefined
+        ? menuApi.create(operation.data)
+        : menuApi.update(operation.id, operation.data)
+    },
+    onSuccess: async (_, operation) => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.menusAll }),
+        invalidateAccess(client),
+      ])
       setDialogOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['menu-all'] })
-      queryClient.invalidateQueries({ queryKey: ['menu-tree'] })
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '操作失败')
-    } finally {
-      setSubmitting(false)
+      setDeleteTarget(null)
+      toast.success(operation.action === 'delete' ? '菜单已删除' : '菜单已保存')
+    },
+    onError: (error) => toast.error(error.message),
+  })
+  const pending = () => client.isMutating({ mutationKey: MENU_WRITE_KEY }) > 0
+  const disabled = mutation.isPending || query.isFetching
+  const openForm = (menu: MenuTreeVO | null) => {
+    if (pending()) return
+    setEditingMenu(menu)
+    form.reset(
+      menu
+        ? {
+            parentId: menu.parentId,
+            name: menu.name,
+            type: menu.type as MenuForm['type'],
+            path: menu.path ?? '',
+            icon: menu.icon ?? '',
+            sortOrder: menu.sortOrder,
+            permission: menu.permission ?? '',
+            visible: menu.visible as 0 | 1,
+            status: menu.status as 0 | 1,
+          }
+        : EMPTY_FORM,
+    )
+    setDialogOpen(true)
+  }
+  const save = (values: MenuForm) => {
+    if (pending()) return
+    if (!parentOptions.some((option) => option.id === values.parentId)) {
+      form.setError('parentId', { message: '请选择有效父菜单' })
+      return
     }
+    mutation.mutate({
+      action: 'save',
+      id: editingMenu?.id,
+      data: {
+        ...values,
+        path: values.type === 3 ? '' : values.path,
+        icon: values.type === 3 ? '' : values.icon,
+      },
+    })
   }
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    setSubmitting(true)
-    try {
-      await menuApi.delete(deleteTarget.id)
-      setDeleteDialogOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['menu-all'] })
-      queryClient.invalidateQueries({ queryKey: ['menu-tree'] })
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '删除失败')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleReset = () => {
-    setSearchName('')
-  }
-
-  // Filter by search name
-  const filteredMenus = searchName
-    ? flatMenus.filter(m => m.name.toLowerCase().includes(searchName.toLowerCase()))
-    : flatMenus
 
   return (
-    <div className="space-y-4">
-      {/* Page Title */}
+    <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-semibold text-gray-800">菜单管理</h1>
-        <p className="mt-0.5 text-sm text-gray-500">管理系统菜单结构与权限标识</p>
+        <h1 className="text-xl font-semibold">菜单管理</h1>
+        <p className="mt-1 text-sm text-muted-foreground">管理系统菜单结构与权限标识</p>
       </div>
-
-      {/* Filter Bar */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
-              <Input
-                placeholder="搜索菜单名称"
-                value={searchName}
-                onChange={e => setSearchName(e.target.value)}
-                className="w-56 pl-9"
-              />
-            </div>
-            <Button variant="outline" size="sm" onClick={handleReset}>
-              <RotateCcw className="size-4" />重置
+        <CardContent className="flex flex-wrap items-center gap-3 p-4">
+          <Input
+            aria-label="搜索菜单名称"
+            placeholder="搜索菜单名称"
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+            className="w-full sm:w-56"
+          />
+          <Button variant="outline" onClick={() => setSearchName('')}>
+            <RotateCcw data-icon="inline-start" />
+            重置
+          </Button>
+          <div className="flex-1" />
+          <HasPermission perm="menu:create">
+            <Button disabled={disabled || !query.isSuccess} onClick={() => openForm(null)}>
+              <Plus data-icon="inline-start" />
+              新增菜单
             </Button>
-            <div className="flex-1" />
-            <HasPermission perm="menu:create">
-              <Button onClick={openCreate}>
-                <Plus className="size-4" />新增菜单
-              </Button>
-            </HasPermission>
-          </div>
+          </HasPermission>
         </CardContent>
       </Card>
-
-      {/* Table */}
-      <Card>
+      <Card aria-busy={query.isFetching}>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
-                <TableHead className="min-w-[200px] pl-4">名称</TableHead>
+              <TableRow className="bg-muted/60">
+                <TableHead className="min-w-48 pl-4">名称</TableHead>
                 <TableHead>类型</TableHead>
                 <TableHead>路由路径</TableHead>
                 <TableHead>图标</TableHead>
                 <TableHead>权限标识</TableHead>
                 <TableHead>排序</TableHead>
                 <TableHead>状态</TableHead>
-                <TableHead className="pr-4 text-right">操作</TableHead>
+                <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {query.isLoading || query.isError || !rows.length ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center">
-                    <Loader2 className="mx-auto size-6 animate-spin text-gray-400" />
-                  </TableCell>
-                </TableRow>
-              ) : filteredMenus.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-gray-400">
-                    暂无菜单数据
+                  <TableCell colSpan={8}>
+                    <QueryState
+                      isLoading={query.isLoading}
+                      isError={query.isError}
+                      isEmpty={!rows.length}
+                      onRetry={() => void query.refetch()}
+                    />
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredMenus.map((menu) => {
-                  const typeInfo = TYPE_LABELS[menu.type] || { text: '未知', className: 'bg-gray-100 text-gray-600' }
-                  return (
-                    <TableRow key={menu.id} className="even:bg-gray-50/40">
-                      <TableCell className="pl-4">
-                        <div className="flex items-center gap-1" style={{ paddingLeft: `${menu.depth * 20}px` }}>
-                          {menu.hasChildren ? (
-                            <button onClick={() => toggleExpand(menu.id)} className="rounded p-0.5 hover:bg-gray-100">
-                              {expanded.has(menu.id) ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                            </button>
-                          ) : (
-                            <span className="w-5" />
-                          )}
-                          <span className="font-medium text-gray-700">{menu.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', typeInfo.className)}>
-                          {typeInfo.text}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-gray-500">{menu.path || '-'}</TableCell>
-                      <TableCell className="text-gray-500">{menu.icon || '-'}</TableCell>
-                      <TableCell className="font-mono text-xs text-gray-500">{menu.permission || '-'}</TableCell>
-                      <TableCell className="text-gray-600">{menu.sortOrder}</TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center gap-1.5 text-sm">
-                          <span className={cn('size-2 rounded-full', menu.status === 1 ? 'bg-green-500' : 'bg-red-400')} />
-                          {menu.status === 1 ? '启用' : '禁用'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="pr-4">
-                        <div className="flex items-center justify-end gap-1">
-                          <HasPermission perm="menu:update">
-                            <button
-                              onClick={() => openEdit(menu)}
-                              className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
-                            >
-                              编辑
-                            </button>
-                          </HasPermission>
-                          <HasPermission perm="menu:delete">
-                            <button
-                              onClick={() => openDelete(menu)}
-                              className="rounded-md px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-                            >
-                              删除
-                            </button>
-                          </HasPermission>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
+                rows.map((menu) => (
+                  <TableRow key={menu.id}>
+                    <TableCell className="pl-4">
+                      <div
+                        className="flex items-center gap-1"
+                        style={{ paddingLeft: menu.depth * 20 }}
+                      >
+                        {menu.children?.length ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`${search || expanded.has(menu.id) ? '收起' : '展开'}${menu.name}`}
+                            aria-expanded={!!search || expanded.has(menu.id)}
+                            disabled={!!search}
+                            onClick={() =>
+                              setExpanded((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(menu.id)) next.delete(menu.id)
+                                else next.add(menu.id)
+                                return next
+                              })
+                            }
+                          >
+                            {search || expanded.has(menu.id) ? <ChevronDown /> : <ChevronRight />}
+                          </Button>
+                        ) : (
+                          <span className="w-9" />
+                        )}
+                        <span className="font-medium">{menu.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{TYPE_LABELS[menu.type] ?? '未知'}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{menu.path || '-'}</TableCell>
+                    <TableCell>{menu.icon || '-'}</TableCell>
+                    <TableCell className="font-mono text-xs">{menu.permission || '-'}</TableCell>
+                    <TableCell>{menu.sortOrder}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={menu.status} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <HasPermission perm="menu:update">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={disabled}
+                            onClick={() => openForm(menu)}
+                          >
+                            编辑
+                          </Button>
+                        </HasPermission>
+                        <HasPermission perm="menu:delete">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={disabled}
+                            onClick={() => setDeleteTarget(menu)}
+                          >
+                            删除
+                          </Button>
+                        </HasPermission>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-
-      {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md rounded-xl">
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (!pending()) setDialogOpen(open)
+        }}
+      >
+        <DialogContent className="max-h-[90dvh] overflow-auto rounded-2xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingMenu ? '编辑菜单' : '新增菜单'}</DialogTitle>
-            <DialogDescription>{editingMenu ? '修改菜单信息' : '创建新的菜单项'}</DialogDescription>
+            <DialogDescription>父菜单不能为自身、子菜单或按钮。</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>父菜单</Label>
-              <Select value={String(form.parentId)} onValueChange={v => setForm({ ...form, parentId: Number(v) })}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {parentOptions.map(opt => (
-                    <SelectItem key={opt.id} value={String(opt.id)}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>菜单类型</Label>
-              <Select value={String(form.type)} onValueChange={v => setForm({ ...form, type: Number(v) })}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">目录</SelectItem>
-                  <SelectItem value="2">菜单</SelectItem>
-                  <SelectItem value="3">按钮</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-0.5">
-                菜单名称 <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                value={form.name}
-                placeholder="请输入菜单名称"
-                onChange={e => setForm({ ...form, name: e.target.value })}
-              />
-            </div>
-            {form.type !== 3 && (
-              <div className="space-y-1.5">
-                <Label>路由路径</Label>
-                <Input
-                  value={form.path}
-                  placeholder="如: /users"
-                  onChange={e => setForm({ ...form, path: e.target.value })}
+          <form noValidate onSubmit={form.handleSubmit(save)} className="flex flex-col gap-5">
+            <fieldset disabled={mutation.isPending} className="rounded-2xl bg-muted/40 p-4">
+              <FieldGroup>
+                <Controller
+                  name="parentId"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Field data-invalid={!!errors.parentId}>
+                      <FieldLabel htmlFor="menu-parent">父菜单</FieldLabel>
+                      <Select
+                        value={String(field.value)}
+                        onValueChange={(value) => field.onChange(Number(value))}
+                        disabled={mutation.isPending}
+                      >
+                        <SelectTrigger
+                          id="menu-parent"
+                          ref={field.ref}
+                          onBlur={field.onBlur}
+                          aria-invalid={!!errors.parentId}
+                          aria-describedby="menu-parent-error"
+                          className="w-full rounded-xl border-0 bg-muted!"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {parentOptions.map((option) => (
+                              <SelectItem key={option.id} value={String(option.id)}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      <FieldError id="menu-parent-error" errors={[errors.parentId]} />
+                    </Field>
+                  )}
                 />
-              </div>
-            )}
-            {form.type !== 3 && (
-              <div className="space-y-1.5">
-                <Label>图标</Label>
-                <Input
-                  value={form.icon}
-                  placeholder="如: Users"
-                  onChange={e => setForm({ ...form, icon: e.target.value })}
+                <Controller
+                  name="type"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel htmlFor="menu-type">菜单类型</FieldLabel>
+                      <Select
+                        value={String(field.value)}
+                        onValueChange={(value) => field.onChange(Number(value))}
+                        disabled={mutation.isPending}
+                      >
+                        <SelectTrigger
+                          id="menu-type"
+                          ref={field.ref}
+                          onBlur={field.onBlur}
+                          className="w-full rounded-xl border-0 bg-muted!"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
                 />
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <Label>权限标识</Label>
-              <Input
-                value={form.permission}
-                placeholder="如: user:create"
-                onChange={e => setForm({ ...form, permission: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>排序</Label>
-                <Input
-                  type="number"
-                  value={form.sortOrder}
-                  onChange={e => setForm({ ...form, sortOrder: Number(e.target.value) })}
+                <Field data-invalid={!!errors.name}>
+                  <FieldLabel htmlFor="menu-name">菜单名称</FieldLabel>
+                  <Input
+                    id="menu-name"
+                    {...form.register('name')}
+                    aria-invalid={!!errors.name}
+                    aria-describedby="menu-name-error"
+                    className="rounded-xl border-0 bg-muted!"
+                  />
+                  <FieldError id="menu-name-error" errors={[errors.name]} />
+                </Field>
+                {type !== 3 && (
+                  <Field data-invalid={!!errors.path}>
+                    <FieldLabel htmlFor="menu-path">
+                      路由路径{type === 2 ? '（必填）' : ''}
+                    </FieldLabel>
+                    <Input
+                      id="menu-path"
+                      {...form.register('path')}
+                      placeholder="如 /users"
+                      aria-invalid={!!errors.path}
+                      aria-describedby="menu-path-error"
+                      className="rounded-xl border-0 bg-muted!"
+                    />
+                    <FieldError id="menu-path-error" errors={[errors.path]} />
+                  </Field>
+                )}
+                {type !== 3 && (
+                  <Field>
+                    <FieldLabel htmlFor="menu-icon">图标</FieldLabel>
+                    <Input
+                      id="menu-icon"
+                      {...form.register('icon')}
+                      placeholder="如 Users"
+                      className="rounded-xl border-0 bg-muted!"
+                    />
+                  </Field>
+                )}
+                <Field data-invalid={!!errors.permission}>
+                  <FieldLabel htmlFor="menu-permission">
+                    权限标识{type === 3 ? '（必填）' : ''}
+                  </FieldLabel>
+                  <Input
+                    id="menu-permission"
+                    {...form.register('permission')}
+                    placeholder="如 user:create"
+                    aria-invalid={!!errors.permission}
+                    aria-describedby="menu-permission-error"
+                    className="rounded-xl border-0 bg-muted!"
+                  />
+                  <FieldError id="menu-permission-error" errors={[errors.permission]} />
+                </Field>
+                <Field data-invalid={!!errors.sortOrder}>
+                  <FieldLabel htmlFor="menu-sort">排序</FieldLabel>
+                  <Input
+                    id="menu-sort"
+                    type="number"
+                    {...form.register('sortOrder', { valueAsNumber: true })}
+                    aria-invalid={!!errors.sortOrder}
+                    aria-describedby="menu-sort-error"
+                    className="rounded-xl border-0 bg-muted!"
+                  />
+                  <FieldError id="menu-sort-error" errors={[errors.sortOrder]} />
+                </Field>
+                <Controller
+                  name="status"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Field>
+                      <FieldLabel htmlFor="menu-status">状态</FieldLabel>
+                      <Select
+                        value={String(field.value)}
+                        onValueChange={(value) => field.onChange(Number(value))}
+                        disabled={mutation.isPending}
+                      >
+                        <SelectTrigger
+                          id="menu-status"
+                          ref={field.ref}
+                          onBlur={field.onBlur}
+                          className="w-full rounded-xl border-0 bg-muted!"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem value="1">启用</SelectItem>
+                            <SelectItem value="0">禁用</SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
                 />
-              </div>
-              <div className="space-y-1.5">
-                <Label>状态</Label>
-                <Select value={String(form.status)} onValueChange={v => setForm({ ...form, status: Number(v) })}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">启用</SelectItem>
-                    <SelectItem value="0">禁用</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit} disabled={submitting || !form.name}>
-              {submitting && <Loader2 className="size-4 animate-spin" />}
-              确定
-            </Button>
-          </DialogFooter>
+              </FieldGroup>
+            </fieldset>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={mutation.isPending}
+                onClick={() => setDialogOpen(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending && (
+                  <Loader2 className="animate-spin" data-icon="inline-start" />
+                )}
+                确定
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="max-w-sm rounded-xl">
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !pending()) setDeleteTarget(null)
+        }}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-full bg-red-100">
-                <AlertTriangle className="size-4 text-red-600" />
-              </span>
-              删除菜单
-            </DialogTitle>
-            <DialogDescription className="pt-1">
-              确定要删除菜单「{deleteTarget?.name}」吗？此操作不可撤销，子菜单也将一并删除。
+            <DialogTitle>删除菜单</DialogTitle>
+            <DialogDescription>
+              确定要删除菜单「{deleteTarget?.name}
+              」吗？此操作不可撤销。包含子菜单时，请先删除子菜单。
             </DialogDescription>
           </DialogHeader>
-          {deleteTarget && (
-            <div className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
-                <LayoutDashboard className="size-5" />
-              </div>
-              <div>
-                <div className="font-medium text-gray-800">{deleteTarget.name}</div>
-                <div className="text-sm text-gray-400">{deleteTarget.path || '无路径'}</div>
-              </div>
-            </div>
-          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>取消</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
-              {submitting && <Loader2 className="size-4 animate-spin" />}
+            <Button
+              variant="outline"
+              disabled={mutation.isPending}
+              onClick={() => setDeleteTarget(null)}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={mutation.isPending}
+              onClick={() => {
+                if (deleteTarget && !pending())
+                  mutation.mutate({ action: 'delete', id: deleteTarget.id })
+              }}
+            >
+              {mutation.isPending && <Loader2 data-icon="inline-start" className="animate-spin" />}
               确认删除
             </Button>
           </DialogFooter>

@@ -1,299 +1,378 @@
 import { useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  Plus, Loader2, Shield,
-  Search, RotateCcw, AlertTriangle,
-} from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod/v4'
+import { Plus, Loader2, RotateCcw } from 'lucide-react'
+import { toast } from 'sonner'
+import { HasPermission } from '@/components/HasPermission'
+import { Pagination } from '@/components/business/Pagination'
+import { QueryState } from '@/components/business/QueryState'
+import { StatusBadge } from '@/components/business/StatusBadge'
+import { useAllMenus } from '@/hooks/useMenuTree'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { usePagedQuery } from '@/hooks/usePagedQuery'
+import { queryKeys } from '@/lib/queryKeys'
+import { invalidateAccess } from '@/lib/queryInvalidation'
+import { roleApi } from '@/services/api/role'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from '@/components/ui/table'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Pagination } from '@/components/ui/pagination'
-import { cn } from '@/lib/utils'
-import { HasPermission } from '@/components/HasPermission'
-import { roleApi } from '@/services/api/role'
-import { useAllMenus } from '@/hooks/useMenuTree'
 import type { RoleVO, CreateRoleRequest, UpdateRoleRequest, MenuTreeVO } from '@/types/api'
 
+const ROLE_WRITE_KEY = ['role-write'] as const
+const roleSchema = z.object({
+  name: z.string().trim().min(1, '请输入角色名称'),
+  code: z.string().trim().min(1, '请输入角色编码'),
+  sortOrder: z.number({ error: '请输入排序数字' }).int('排序必须是整数'),
+  remark: z.string().trim(),
+})
+type RoleForm = z.infer<typeof roleSchema>
+type RoleOperation =
+  | { action: 'create'; data: CreateRoleRequest }
+  | { action: 'update'; id: number; data: UpdateRoleRequest }
+  | { action: 'delete'; id: number }
+
+function collectAllIds(menus: MenuTreeVO[]): number[] {
+  return menus.flatMap((menu) => [menu.id, ...collectAllIds(menu.children ?? [])])
+}
+
 function MenuTreeCheckbox({
-  menus, checked, onToggle, depth = 0,
+  menus,
+  checked,
+  onToggle,
+  disabled,
+  depth = 0,
 }: {
   menus: MenuTreeVO[]
   checked: Set<number>
-  onToggle: (id: number, children: MenuTreeVO[]) => void
+  onToggle: (menu: MenuTreeVO) => void
+  disabled: boolean
   depth?: number
 }) {
+  return menus.map((menu) => (
+    <div key={menu.id}>
+      <label className="flex items-center gap-2 py-2" style={{ paddingLeft: depth * 16 }}>
+        <Checkbox
+          checked={checked.has(menu.id)}
+          disabled={disabled}
+          onCheckedChange={() => onToggle(menu)}
+        />
+        <span className="text-sm">{menu.name}</span>
+        {menu.permission && (
+          <code className="text-xs text-muted-foreground">{menu.permission}</code>
+        )}
+      </label>
+      {menu.children?.length > 0 && (
+        <MenuTreeCheckbox
+          menus={menu.children}
+          checked={checked}
+          onToggle={onToggle}
+          disabled={disabled}
+          depth={depth + 1}
+        />
+      )}
+    </div>
+  ))
+}
+
+function AssignRoleDialog({ role, onClose }: { role: RoleVO; onClose: () => void }) {
+  const client = useQueryClient()
+  const detail = useQuery({
+    queryKey: queryKeys.roleDetail(role.id),
+    queryFn: ({ signal }) => roleApi.getById(role.id, signal),
+    staleTime: 0,
+    refetchOnMount: 'always',
+  })
+  const menus = useAllMenus()
+  const [selection, setSelection] = useState<Set<number> | null>(null)
+  const checked = selection ?? new Set(detail.data?.menuIds ?? [])
+  const mutation = useMutation({
+    mutationKey: ROLE_WRITE_KEY,
+    mutationFn: (ids: number[]) => roleApi.assignMenus(role.id, ids),
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.roleDetail(role.id) }),
+        client.invalidateQueries({ queryKey: queryKeys.rolesRoot }),
+        client.invalidateQueries({ queryKey: queryKeys.rolesAll }),
+        invalidateAccess(client),
+      ])
+      onClose()
+      toast.success('权限已保存')
+    },
+    onError: (error) => toast.error(error.message),
+  })
+  const isLoading =
+    detail.isLoading || menus.isLoading || (!detail.isFetchedAfterMount && !detail.isError)
+  const isError = detail.isError || menus.isError
+  const disabled =
+    isLoading || isError || detail.isFetching || menus.isFetching || mutation.isPending
+  const pending = () => client.isMutating({ mutationKey: ROLE_WRITE_KEY }) > 0
+  const toggle = (menu: MenuTreeVO) => {
+    if (disabled || pending()) return
+    const next = new Set(checked)
+    const ids = [menu.id, ...collectAllIds(menu.children ?? [])]
+    if (next.has(menu.id)) ids.forEach((id) => next.delete(id))
+    else ids.forEach((id) => next.add(id))
+    setSelection(next)
+  }
   return (
-    <>
-      {menus.map((menu) => (
-        <div key={menu.id}>
-          <div className="flex items-center gap-2 py-1" style={{ paddingLeft: `${depth * 20}px` }}>
-            <Checkbox
-              checked={checked.has(menu.id)}
-              onCheckedChange={() => onToggle(menu.id, menu.children || [])}
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !pending()) onClose()
+      }}
+    >
+      <DialogContent className="rounded-2xl sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>分配权限 - {role.name}</DialogTitle>
+          <DialogDescription>选择该角色可以访问的菜单和权限</DialogDescription>
+        </DialogHeader>
+        <fieldset className="max-h-[50dvh] overflow-auto rounded-2xl bg-muted/50 p-4">
+          <legend className="sr-only">菜单权限</legend>
+          <QueryState
+            isLoading={isLoading}
+            isError={isError}
+            isEmpty={!menus.data?.length}
+            onRetry={() => {
+              void detail.refetch()
+              void menus.refetch()
+            }}
+          />
+          {!isLoading && !isError && menus.data && (
+            <MenuTreeCheckbox
+              menus={menus.data}
+              checked={checked}
+              onToggle={toggle}
+              disabled={disabled}
             />
-            <span className="text-sm">{menu.name}</span>
-            {menu.permission && (
-              <span className="text-xs text-gray-400 font-mono">{menu.permission}</span>
-            )}
-          </div>
-          {menu.children?.length ? (
-            <MenuTreeCheckbox menus={menu.children} checked={checked} onToggle={onToggle} depth={depth + 1} />
-          ) : null}
-        </div>
-      ))}
-    </>
+          )}
+        </fieldset>
+        <DialogFooter>
+          <Button variant="outline" disabled={mutation.isPending} onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            disabled={disabled}
+            onClick={() => {
+              if (!disabled && !pending()) mutation.mutate(Array.from(checked))
+            }}
+          >
+            {mutation.isPending && <Loader2 className="animate-spin" data-icon="inline-start" />}
+            保存
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
-function collectAllIds(menus: MenuTreeVO[]): number[] {
-  const ids: number[] = []
-  for (const menu of menus) {
-    ids.push(menu.id)
-    if (menu.children?.length) ids.push(...collectAllIds(menu.children))
-  }
-  return ids
-}
-
 export function RolePage() {
-  const queryClient = useQueryClient()
-  const [page, setPage] = useState(1)
+  const client = useQueryClient()
   const [searchName, setSearchName] = useState('')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
-
-  const { data: pageData, isLoading } = useQuery({
-    queryKey: ['roles', page, searchName],
-    queryFn: () => roleApi.page({ current: page, size: 10, name: searchName || undefined }),
-  })
-
+  const [filterStatus, setFilterStatus] = useState('all')
+  const name = useDebouncedValue(searchName).trim() || undefined
+  const filters = { name, status: filterStatus === 'all' ? undefined : Number(filterStatus) }
+  const list = usePagedQuery(queryKeys.roles(filters), (page, signal) =>
+    roleApi.page({ ...filters, current: page, size: 10 }, signal),
+  )
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editRole, setEditRole] = useState<RoleVO | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [form, setForm] = useState<CreateRoleRequest>({ name: '', code: '', sortOrder: 0, remark: '' })
-
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [assignRole, setAssignRole] = useState<RoleVO | null>(null)
-  const [checkedMenus, setCheckedMenus] = useState<Set<number>>(new Set())
-  const { data: allMenus } = useAllMenus(assignDialogOpen)
-
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<RoleVO | null>(null)
-
-  const openCreate = () => {
-    setEditRole(null)
-    setForm({ name: '', code: '', sortOrder: 0, remark: '' })
-    setDialogOpen(true)
-  }
-
-  const openEdit = (role: RoleVO) => {
-    setEditRole(role)
-    setForm({ name: role.name, code: role.code, sortOrder: role.sortOrder, remark: role.remark || '' })
-    setDialogOpen(true)
-  }
-
-  const openAssign = async (role: RoleVO) => {
-    setAssignRole(role)
-    const detail = await roleApi.getById(role.id)
-    setCheckedMenus(new Set(detail.menuIds || []))
-    setAssignDialogOpen(true)
-  }
-
-  const openDelete = (role: RoleVO) => {
-    setDeleteTarget(role)
-    setDeleteDialogOpen(true)
-  }
-
-  const handleSubmit = async () => {
-    setSubmitting(true)
-    try {
-      if (editRole) {
-        const updateData: UpdateRoleRequest = {
-          name: form.name, sortOrder: form.sortOrder, remark: form.remark,
-        }
-        await roleApi.update(editRole.id, updateData)
-      } else {
-        await roleApi.create(form)
-      }
-      setDialogOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '操作失败')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleAssign = async () => {
-    if (!assignRole) return
-    setSubmitting(true)
-    try {
-      await roleApi.assignMenus(assignRole.id, Array.from(checkedMenus))
-      setAssignDialogOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
-      queryClient.invalidateQueries({ queryKey: ['menu-tree'] })
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '操作失败')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleToggleMenu = (id: number, children: MenuTreeVO[]) => {
-    setCheckedMenus(prev => {
-      const next = new Set(prev)
-      const allIds = [id, ...collectAllIds(children)]
-      if (next.has(id)) {
-        allIds.forEach(i => next.delete(i))
-      } else {
-        allIds.forEach(i => next.add(i))
-      }
-      return next
-    })
-  }
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-    setSubmitting(true)
-    try {
-      await roleApi.delete(deleteTarget.id)
-      setDeleteDialogOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
-    } catch (err) {
-      alert(err instanceof Error ? err.message : '删除失败')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleReset = () => {
-    setSearchName('')
-    setFilterStatus('all')
-    setPage(1)
-  }
-
-  // Client-side filter for status
-  const roles = (pageData?.records || []).filter(r => {
-    if (filterStatus !== 'all' && String(r.status) !== filterStatus) return false
-    return true
+  const form = useForm<RoleForm>({
+    resolver: zodResolver(roleSchema),
+    defaultValues: { name: '', code: '', sortOrder: 0, remark: '' },
   })
-  const total = pageData?.total || 0
-  const totalPages = pageData?.pages || 0
+  const { errors } = form.formState
+  const mutation = useMutation({
+    mutationKey: ROLE_WRITE_KEY,
+    mutationFn: (operation: RoleOperation) => {
+      if (operation.action === 'create') return roleApi.create(operation.data)
+      if (operation.action === 'update') return roleApi.update(operation.id, operation.data)
+      return roleApi.delete(operation.id)
+    },
+    onSuccess: async (_, operation) => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.rolesRoot }),
+        client.invalidateQueries({ queryKey: queryKeys.rolesAll }),
+        client.invalidateQueries({ queryKey: queryKeys.adminUsersRoot }),
+        ...(operation.action === 'delete' ? [invalidateAccess(client)] : []),
+      ])
+      setDialogOpen(false)
+      setDeleteTarget(null)
+      toast.success(operation.action === 'delete' ? '角色已删除' : '角色已保存')
+    },
+    onError: (error) => toast.error(error.message),
+  })
+  const pending = () => client.isMutating({ mutationKey: ROLE_WRITE_KEY }) > 0
+  const disabled = mutation.isPending || list.isFetching
+  const openForm = (role: RoleVO | null) => {
+    if (pending()) return
+    setEditRole(role)
+    form.reset(
+      role
+        ? { name: role.name, code: role.code, sortOrder: role.sortOrder, remark: role.remark ?? '' }
+        : { name: '', code: '', sortOrder: 0, remark: '' },
+    )
+    setDialogOpen(true)
+  }
+  const save = (values: RoleForm) => {
+    if (pending()) return
+    if (editRole) {
+      const { name, sortOrder, remark } = values
+      mutation.mutate({ action: 'update', id: editRole.id, data: { name, sortOrder, remark } })
+    } else mutation.mutate({ action: 'create', data: values })
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Page Title */}
+    <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-semibold text-gray-800">角色管理</h1>
-        <p className="mt-0.5 text-sm text-gray-500">管理系统角色及菜单权限分配</p>
+        <h1 className="text-xl font-semibold">角色管理</h1>
+        <p className="mt-1 text-sm text-muted-foreground">管理系统角色及菜单权限分配</p>
       </div>
-
-      {/* Filter Bar */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-gray-400" />
-              <Input
-                placeholder="搜索角色名称"
-                value={searchName}
-                onChange={e => { setSearchName(e.target.value); setPage(1) }}
-                className="w-56 pl-9"
-              />
-            </div>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="选择状态" />
-              </SelectTrigger>
-              <SelectContent>
+        <CardContent className="flex flex-wrap items-center gap-3 p-4">
+          <Input
+            aria-label="搜索角色名称"
+            placeholder="搜索角色名称"
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+            className="w-full sm:w-56"
+          />
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-32" aria-label="状态筛选">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
                 <SelectItem value="all">全部状态</SelectItem>
                 <SelectItem value="1">启用</SelectItem>
                 <SelectItem value="0">禁用</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="sm" onClick={handleReset}>
-              <RotateCcw className="size-4" />重置
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSearchName('')
+              setFilterStatus('all')
+              list.setPage(1)
+            }}
+          >
+            <RotateCcw data-icon="inline-start" />
+            重置
+          </Button>
+          <div className="flex-1" />
+          <HasPermission perm="role:create">
+            <Button disabled={mutation.isPending} onClick={() => openForm(null)}>
+              <Plus data-icon="inline-start" />
+              新增角色
             </Button>
-            <div className="flex-1" />
-            <HasPermission perm="role:create">
-              <Button onClick={openCreate}>
-                <Plus className="size-4" />新增角色
-              </Button>
-            </HasPermission>
-          </div>
+          </HasPermission>
         </CardContent>
       </Card>
-
-      {/* Table */}
-      <Card>
+      <Card aria-busy={list.isFetching}>
         <CardContent className="p-0">
+          {list.isFetching && !list.isLoading && (
+            <p role="status" className="p-3 text-sm text-muted-foreground">
+              正在更新列表…
+            </p>
+          )}
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+              <TableRow className="bg-muted/60">
                 <TableHead className="pl-4">角色名称</TableHead>
                 <TableHead>编码</TableHead>
                 <TableHead>排序</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>备注</TableHead>
                 <TableHead>创建时间</TableHead>
-                <TableHead className="pr-4 text-right">操作</TableHead>
+                <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="h-24 text-center"><Loader2 className="mx-auto size-6 animate-spin text-gray-400" /></TableCell></TableRow>
-              ) : roles.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="h-24 text-center text-gray-400">暂无数据</TableCell></TableRow>
+              {list.isLoading || list.isError || list.records.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7}>
+                    <QueryState
+                      isLoading={list.isLoading}
+                      isError={list.isError}
+                      isEmpty={!list.records.length}
+                      onRetry={() => void list.refetch()}
+                    />
+                  </TableCell>
+                </TableRow>
               ) : (
-                roles.map(role => (
-                  <TableRow key={role.id} className="even:bg-gray-50/40">
-                    <TableCell className="pl-4 font-medium text-gray-800">{role.name}</TableCell>
+                list.records.map((role) => (
+                  <TableRow key={role.id}>
+                    <TableCell className="pl-4 font-medium">{role.name}</TableCell>
                     <TableCell>
-                      <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">{role.code}</code>
+                      <code className="text-xs text-muted-foreground">{role.code}</code>
                     </TableCell>
-                    <TableCell className="text-gray-600">{role.sortOrder}</TableCell>
+                    <TableCell>{role.sortOrder}</TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center gap-1.5 text-sm">
-                        <span className={cn('size-2 rounded-full', role.status === 1 ? 'bg-green-500' : 'bg-red-400')} />
-                        {role.status === 1 ? '启用' : '禁用'}
-                      </span>
+                      <StatusBadge status={role.status} />
                     </TableCell>
-                    <TableCell className="text-gray-500">{role.remark || '-'}</TableCell>
-                    <TableCell className="text-sm text-gray-500">{role.createTime}</TableCell>
-                    <TableCell className="pr-4">
-                      <div className="flex items-center justify-end gap-1">
+                    <TableCell>{role.remark || '-'}</TableCell>
+                    <TableCell className="text-muted-foreground">{role.createTime}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
                         <HasPermission perm="role:assign">
-                          <button
-                            onClick={() => openAssign(role)}
-                            className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={disabled}
+                            onClick={() => setAssignRole(role)}
                           >
                             权限
-                          </button>
+                          </Button>
                         </HasPermission>
                         <HasPermission perm="role:update">
-                          <button
-                            onClick={() => openEdit(role)}
-                            className="rounded-md px-2.5 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={disabled}
+                            onClick={() => openForm(role)}
                           >
                             编辑
-                          </button>
+                          </Button>
                         </HasPermission>
                         <HasPermission perm="role:delete">
-                          <button
-                            onClick={() => openDelete(role)}
-                            className="rounded-md px-2.5 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={disabled}
+                            onClick={() => setDeleteTarget(role)}
                           >
                             删除
-                          </button>
+                          </Button>
                         </HasPermission>
                       </div>
                     </TableCell>
@@ -302,126 +381,135 @@ export function RolePage() {
               )}
             </TableBody>
           </Table>
-          <div className="px-4">
-            <Pagination
-              current={page}
-              total={total}
-              totalPages={totalPages}
-              onPageChange={setPage}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md rounded-xl">
-          <DialogHeader>
-            <DialogTitle>{editRole ? '编辑角色' : '新增角色'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label className="flex items-center gap-0.5">
-                角色名称 <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                value={form.name}
-                placeholder="请输入角色名称"
-                onChange={e => setForm({ ...form, name: e.target.value })}
+          {!list.isError && (
+            <div className="px-4">
+              <Pagination
+                current={list.page}
+                total={list.total}
+                totalPages={list.totalPages}
+                onPageChange={list.setPage}
               />
-            </div>
-            {!editRole && (
-              <div className="space-y-1.5">
-                <Label className="flex items-center gap-0.5">
-                  角色编码 <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  value={form.code}
-                  placeholder="如: support"
-                  onChange={e => setForm({ ...form, code: e.target.value })}
-                />
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <Label>排序</Label>
-              <Input
-                type="number"
-                value={form.sortOrder}
-                onChange={e => setForm({ ...form, sortOrder: Number(e.target.value) })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>备注</Label>
-              <Input
-                value={form.remark}
-                placeholder="请输入备注信息"
-                onChange={e => setForm({ ...form, remark: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit} disabled={submitting || !form.name || (!editRole && !form.code)}>
-              {submitting && <Loader2 className="size-4 animate-spin" />}
-              确定
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assign Permissions Dialog */}
-      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent className="max-w-md rounded-xl">
-          <DialogHeader>
-            <DialogTitle>分配权限 - {assignRole?.name}</DialogTitle>
-            <DialogDescription>选择该角色可以访问的菜单和权限</DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-gray-100 p-3">
-            {allMenus ? (
-              <MenuTreeCheckbox menus={allMenus} checked={checkedMenus} onToggle={handleToggleMenu} />
-            ) : (
-              <div className="py-4 text-center"><Loader2 className="mx-auto size-6 animate-spin text-gray-400" /></div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>取消</Button>
-            <Button onClick={handleAssign} disabled={submitting}>
-              {submitting && <Loader2 className="size-4 animate-spin" />}
-              保存
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent className="max-w-sm rounded-xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <span className="flex size-8 items-center justify-center rounded-full bg-red-100">
-                <AlertTriangle className="size-4 text-red-600" />
-              </span>
-              删除角色
-            </DialogTitle>
-            <DialogDescription className="pt-1">
-              确定要删除角色「{deleteTarget?.name}」吗？此操作不可撤销，删除后关联的管理员将失去该角色权限。
-            </DialogDescription>
-          </DialogHeader>
-          {deleteTarget && (
-            <div className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white">
-                <Shield className="size-5" />
-              </div>
-              <div>
-                <div className="font-medium text-gray-800">{deleteTarget.name}</div>
-                <div className="text-sm text-gray-400">{deleteTarget.code}</div>
-              </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (!pending()) setDialogOpen(open)
+        }}
+      >
+        <DialogContent className="max-h-[90dvh] overflow-auto rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editRole ? '编辑角色' : '新增角色'}</DialogTitle>
+            <DialogDescription>填写角色信息，角色编码创建后不可修改。</DialogDescription>
+          </DialogHeader>
+          <form noValidate onSubmit={form.handleSubmit(save)} className="flex flex-col gap-5">
+            <fieldset disabled={mutation.isPending} className="rounded-2xl bg-muted/40 p-4">
+              <FieldGroup>
+                <Field data-invalid={!!errors.name}>
+                  <FieldLabel htmlFor="role-name">角色名称</FieldLabel>
+                  <Input
+                    id="role-name"
+                    {...form.register('name')}
+                    className="rounded-xl border-0 bg-muted!"
+                    aria-invalid={!!errors.name}
+                    aria-describedby="role-name-error"
+                  />
+                  <FieldError id="role-name-error" errors={[errors.name]} />
+                </Field>
+                {!editRole && (
+                  <Field data-invalid={!!errors.code}>
+                    <FieldLabel htmlFor="role-code">角色编码</FieldLabel>
+                    <Input
+                      id="role-code"
+                      {...form.register('code')}
+                      placeholder="如 support"
+                      className="rounded-xl border-0 bg-muted!"
+                      aria-invalid={!!errors.code}
+                      aria-describedby="role-code-error"
+                    />
+                    <FieldError id="role-code-error" errors={[errors.code]} />
+                  </Field>
+                )}
+                <Field data-invalid={!!errors.sortOrder}>
+                  <FieldLabel htmlFor="role-sort">排序</FieldLabel>
+                  <Input
+                    id="role-sort"
+                    type="number"
+                    {...form.register('sortOrder', { valueAsNumber: true })}
+                    className="rounded-xl border-0 bg-muted!"
+                    aria-invalid={!!errors.sortOrder}
+                    aria-describedby="role-sort-error"
+                  />
+                  <FieldError id="role-sort-error" errors={[errors.sortOrder]} />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="role-remark">备注</FieldLabel>
+                  <Input
+                    id="role-remark"
+                    {...form.register('remark')}
+                    className="rounded-xl border-0 bg-muted!"
+                  />
+                </Field>
+              </FieldGroup>
+            </fieldset>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={mutation.isPending}
+                onClick={() => setDialogOpen(false)}
+              >
+                取消
+              </Button>
+              <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending && (
+                  <Loader2 data-icon="inline-start" className="animate-spin" />
+                )}
+                确定
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {assignRole && (
+        <AssignRoleDialog
+          key={assignRole.id}
+          role={assignRole}
+          onClose={() => setAssignRole(null)}
+        />
+      )}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !pending()) setDeleteTarget(null)
+        }}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>删除角色</DialogTitle>
+            <DialogDescription>
+              确定要删除角色「{deleteTarget?.name}」吗？此操作不可撤销，关联管理员将失去该角色权限。
+            </DialogDescription>
+          </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>取消</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
-              {submitting && <Loader2 className="size-4 animate-spin" />}
+            <Button
+              variant="outline"
+              disabled={mutation.isPending}
+              onClick={() => setDeleteTarget(null)}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={mutation.isPending}
+              onClick={() => {
+                if (deleteTarget && !pending())
+                  mutation.mutate({ action: 'delete', id: deleteTarget.id })
+              }}
+            >
+              {mutation.isPending && <Loader2 data-icon="inline-start" className="animate-spin" />}
               确认删除
             </Button>
           </DialogFooter>

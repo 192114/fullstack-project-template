@@ -17,4 +17,11 @@ public final class LoginAdminUtil {
     public static boolean isAdminLogin() {
         return StpAdminUtil.isLogin();
     }
+
+    /**
+     * 撤销指定管理员的全部会话（禁用/删除管理员后调用，使其立即下线）。
+     */
+    public static void logoutAdmin(Long adminId) {
+        StpAdminUtil.stpLogic.logout(adminId);
+    }
 }

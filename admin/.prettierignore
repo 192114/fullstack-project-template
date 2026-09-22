@@ -1,0 +1,7 @@
+node_modules
+dist
+pnpm-lock.yaml
+public
+.qoder
+src/components/ui
+.agents

@@ -8,6 +8,9 @@ import com.shadow.backend.admin.adminuser.vo.AdminUserManageVO;
 import com.shadow.backend.common.response.PageResult;
 import com.shadow.backend.common.response.Result;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
+import org.springframework.validation.annotation.Validated;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 与 AdminUserController（管理 app_user）不同。
  */
 @RestController
+@Validated
 @RequestMapping("/api/admin/admin-users")
 @RequiredArgsConstructor
 public class AdminUserManageController {
@@ -34,10 +38,13 @@ public class AdminUserManageController {
 
     @GetMapping
     public Result<PageResult<AdminUserManageVO>> page(
-            @RequestParam(defaultValue = "1") long current,
-            @RequestParam(defaultValue = "10") long size,
-            @RequestParam(required = false) String username) {
-        return Result.success(adminUserManageService.page(current, size, username));
+            @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码不能小于1") long current,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "每页条数不能小于1")
+            @Max(value = 100, message = "每页条数不能超过100") long size,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) Long roleId,
+            @RequestParam(required = false) Integer status) {
+        return Result.success(adminUserManageService.page(current, size, username, roleId, status));
     }
 
     @GetMapping("/{id}")
